@@ -2178,48 +2178,102 @@ private struct LowerButtonsPlaceholder: View {
         ) {
 
             lowerButton(
-                "EQ",
                 active: audio.isEQEnabled
             ) {
                 audio.setEQEnabled(
                     !audio.isEQEnabled
                 )
+            } content: {
+
+                Text("EQ")
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium,
+                            design: .monospaced
+                        )
+                    )
             }
 
             lowerButton(
-                "⇄",
                 active: audio.shuffle
             ) {
                 audio.shuffle.toggle()
+            } content: {
+
+                ShuffleIcon(
+                    isActive: audio.shuffle
+                )
+                .frame(
+                    width: 22,
+                    height: 16
+                )
             }
 
             lowerButton(
-                "↻",
                 active: audio.repeatMode != 0
             ) {
+
                 audio.repeatMode += 1
 
                 if audio.repeatMode > 2 {
                     audio.repeatMode = 0
                 }
+
+            } content: {
+
+                RepeatIcon(
+                    mode:
+                        audio.repeatMode == 0
+                            ? .off
+                            : audio.repeatMode == 1
+                                ? .one
+                                : .all
+                )
+                .frame(
+                    width: 22,
+                    height: 16
+                )
             }
 
             lowerButton(
-                "▦",
                 active: false
             ) {
+
                 // Library подключим позже.
+
+            } content: {
+
+                Text("▦")
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium,
+                            design: .monospaced
+                        )
+                    )
             }
 
             lowerButton(
-                "PL",
                 active: showPlaylist
             ) {
+
                 withAnimation(
                     .easeInOut(duration: 0.32)
                 ) {
                     showPlaylist.toggle()
                 }
+
+            } content: {
+
+                Text("PL")
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium,
+                            design: .monospaced
+                        )
+                    )
             }
         }
         .padding(3)
@@ -2236,10 +2290,10 @@ private struct LowerButtonsPlaceholder: View {
         }
     }
 
-    private func lowerButton(
-        _ symbol: String,
+    private func lowerButton<Content: View>(
         active: Bool,
-        action: @escaping () -> Void
+        action: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
     ) -> some View {
 
         Button(
@@ -2292,14 +2346,7 @@ private struct LowerButtonsPlaceholder: View {
                     )
                     .padding(3)
 
-                Text(symbol)
-                    .font(
-                        .system(
-                            size: 11,
-                            weight: .medium,
-                            design: .monospaced
-                        )
-                    )
+                content()
                     .foregroundStyle(
                         PanelMaterials.marking.opacity(
                             active ? 0.58 : 0.82
