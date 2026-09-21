@@ -1,0 +1,70 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "CassettePlayer-arm64-apple-macosx-debug.module": ["<CassettePlayer-arm64-apple-macosx-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<CassettePlayer-arm64-apple-macosx-debug.module>"]
+  "test": ["<CassettePlayer-arm64-apple-macosx-debug.module>"]
+default: "main"
+nodes:
+  "/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/App.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/AudioPlayer.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/AudioTrack.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/IndicatorBlock.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/MechanicalButton.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/PanelMaterials.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/PlayerView.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/PlaylistView.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/DerivedSources/resource_bundle_accessor.swift"]
+    outputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/sources"]
+    description: "Write auxiliary file /Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/sources"
+
+  "/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/cassette.png":
+    tool: copy-tool
+    inputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/Resources/cassette.png"]
+    outputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/cassette.png"]
+    description: "Copying /Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/Resources/cassette.png"
+
+  "/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/cassette_bay.png":
+    tool: copy-tool
+    inputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/Resources/cassette_bay.png"]
+    outputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/cassette_bay.png"]
+    description: "Copying /Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/Resources/cassette_bay.png"
+
+  "/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/katushka.png":
+    tool: copy-tool
+    inputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/Resources/katushka.png"]
+    outputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/katushka.png"]
+    description: "Copying /Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/Resources/katushka.png"
+
+  "/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<CassettePlayer-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/Modules/CassettePlayer.swiftmodule"]
+    outputs: ["<CassettePlayer-arm64-apple-macosx-debug.module>"]
+
+  "C.CassettePlayer-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/App.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/AudioPlayer.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/AudioTrack.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/IndicatorBlock.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/MechanicalButton.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/PanelMaterials.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/PlayerView.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/PlaylistView.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/DerivedSources/resource_bundle_accessor.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","<CassettePlayer-arm64-apple-macosx-debug.module-resources>","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/sources"]
+    outputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/Modules/CassettePlayer.swiftmodule"]
+    description: "Compiling Swift Module 'CassettePlayer' (9 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","CassettePlayer","-emit-dependencies","-emit-module","-emit-module-path","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/Modules/CassettePlayer.swiftmodule","-output-file-map","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/output-file-map.json","-incremental","@/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer.build/sources","-I","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-Onone","-enable-testing","-j8","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE","-module-cache-path","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","CassettePlayer_main","-swift-version","5","-Xfrontend","-experimental-lazy-typecheck","-Xfrontend","-experimental-skip-all-function-bodies","-Xfrontend","-experimental-allow-module-with-compiler-errors","-Xfrontend","-empty-abi-descriptor","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","cassetteplayer_233"]
+
+  "CassettePlayer-arm64-apple-macosx-debug.module-resources":
+    tool: phony
+    inputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/cassette.png","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/cassette_bay.png","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/.build/index-build/arm64-apple-macosx/debug/CassettePlayer_CassettePlayer.bundle/katushka.png"]
+    outputs: ["<CassettePlayer-arm64-apple-macosx-debug.module-resources>"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Sources/CassettePlayer/","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Package.swift","/Users/aleksandrlomakin/DISK_D/CassettePlayer_233/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
