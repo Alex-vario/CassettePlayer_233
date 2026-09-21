@@ -806,6 +806,17 @@ private struct EQPlaceholder: View {
                 )
         }
         .contentShape(Rectangle())
+        .onAppear {
+            let savedValues = audio.savedEQValues
+
+            if values != savedValues {
+                withAnimation(
+                    .easeOut(duration: 0.7)
+                ) {
+                    values = savedValues
+                }
+            }
+        }
         .contextMenu {
             Button("Reset EQ") {
 
@@ -832,41 +843,27 @@ private struct EQPlaceholder: View {
     }
 
     private var eqStatusLED: some View {
-
         RoundedRectangle(
-            cornerRadius: 0.8
+            cornerRadius: 1.5
         )
         .fill(
             audio.isEQEnabled
-                ? Color.red
-                : Color.black.opacity(0.72)
+                ? Color.green.opacity(0.9)
+                : Color.gray.opacity(0.35)
         )
         .frame(
-            width: 8,
-            height: 4
+            width: 6,
+            height: 6
         )
         .overlay {
-
             RoundedRectangle(
-                cornerRadius: 0.8
+                cornerRadius: 1.5
             )
             .stroke(
-                audio.isEQEnabled
-                    ? Color.red.opacity(0.75)
-                    : Color.white.opacity(0.10),
+                Color.black.opacity(0.7),
                 lineWidth: 0.5
             )
         }
-        .shadow(
-            color: audio.isEQEnabled
-                ? Color.red.opacity(0.65)
-                : Color.clear,
-            radius: 3
-        )
-        .animation(
-            .easeOut(duration: 0.18),
-            value: audio.isEQEnabled
-        )
     }
 }
 
