@@ -6,7 +6,9 @@ import AVFoundation
 struct PlayerView: View {
 
     @EnvironmentObject private var audio: AudioPlayer
+
     @State private var showPlaylist = false
+    @State private var showLibrary = false
 
     // MARK: - Geometry
 
@@ -56,24 +58,62 @@ struct PlayerView: View {
 
     // MARK: - Body
 
-    var body: some View {
+var body: some View {
 
         ZStack {
 
             deckBackground
 
             deckLayout
+
+            if showLibrary {
+
+                LibraryView(
+                    audio: audio,
+                    onClose: {
+
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.32
+                            )
+                        ) {
+                            showLibrary = false
+                        }
+                    }
+                )
+                .frame(
+                    width: deckWidth,
+                    height: deckHeight
+                )
+                .transition(
+                    .move(
+                        edge: .top
+                    )
+                )
+                .zIndex(200)
+            }
         }
         .frame(
             width: deckWidth,
             height: deckHeight
         )
+        .clipped()
+        .animation(
+            .easeInOut(
+                duration: 0.32
+            ),
+            value: showLibrary
+        )
         .onDrop(
-            of: [UTType.fileURL.identifier],
+            of: [
+                UTType.fileURL.identifier
+            ],
             isTargeted: nil
         ) { providers in
 
-            handleDrop(providers)
+            handleDrop(
+                providers
+            )
 
             return true
         }
@@ -319,7 +359,8 @@ struct PlayerView: View {
 
             LowerButtonsPlaceholder(
                 audio: audio,
-                showPlaylist: $showPlaylist
+                showPlaylist: $showPlaylist,
+                showLibrary: $showLibrary
             )
             .frame(
                 width: lowerButtonsSize.width,
@@ -2173,6 +2214,7 @@ private struct LowerButtonsPlaceholder: View {
     @ObservedObject var audio: AudioPlayer
 
     @Binding var showPlaylist: Bool
+    @Binding var showLibrary: Bool
 
     var body: some View {
 
@@ -2251,11 +2293,18 @@ private struct LowerButtonsPlaceholder: View {
             // LB — Library
 
             lowerButton(
-                active: false
+                active: showLibrary
             ) {
 
-                // Library подключим здесь,
-                // когда вернём окно библиотеки.
+                withAnimation(
+                    .easeInOut(
+                        duration: 0.32
+                    )
+                ) {
+
+                    showPlaylist = false
+                    showLibrary.toggle()
+                }
 
             } content: {
 
