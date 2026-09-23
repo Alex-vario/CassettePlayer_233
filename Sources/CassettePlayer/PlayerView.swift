@@ -844,26 +844,38 @@ private struct EQPlaceholder: View {
 
     private var eqStatusLED: some View {
         RoundedRectangle(
-            cornerRadius: 1.5
+            cornerRadius: 0.8
         )
         .fill(
             audio.isEQEnabled
-                ? Color.green.opacity(0.9)
-                : Color.gray.opacity(0.35)
+                ? Color.red
+                : Color.black.opacity(0.72)
         )
         .frame(
-            width: 6,
-            height: 6
+            width: 8,
+            height: 4
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 1.5
+                cornerRadius: 0.8
             )
             .stroke(
-                Color.black.opacity(0.7),
+                audio.isEQEnabled
+                    ? Color.red.opacity(0.75)
+                    : Color.white.opacity(0.10),
                 lineWidth: 0.5
             )
         }
+        .shadow(
+            color: audio.isEQEnabled
+                ? Color.red.opacity(0.65)
+                : Color.clear,
+            radius: 3
+        )
+        .animation(
+            .easeOut(duration: 0.18),
+            value: audio.isEQEnabled
+        )
     }
 }
 
@@ -1282,43 +1294,8 @@ private struct CassetteBayPlaceholder: View {
                         )
                 }
 
-                let progress =
-                    audio.duration > 0
-                    ? min(
-                        max(
-                            audio.currentTime
-                            / audio.duration,
-                            0
-                        ),
-                        1
-                    )
-                    : 0
-
-                let leftRadius =
-                    sqrt(1.0 - progress)
-
-                let rightRadius =
-                    sqrt(progress)
-
-                let leftSpeed =
-                    0.75
-                    + (1.0 - leftRadius) * 0.70
-
-                let rightSpeed =
-                    0.75
-                    + (1.0 - rightRadius) * 0.70
-
-                let leftAngle =
-                    progress
-                    * 360.0
-                    * 42.0
-                    * leftSpeed
-
-                let rightAngle =
-                    progress
-                    * 360.0
-                    * 42.0
-                    * rightSpeed
+                let reelAngle =
+                    audio.currentTime * 180.0
 
                 if let reelURL =
                     Bundle.module.url(
@@ -1335,7 +1312,7 @@ private struct CassetteBayPlaceholder: View {
                             height: 25
                         )
                         .rotationEffect(
-                            .degrees(-leftAngle)
+                            .degrees(-reelAngle)
                         )
                         .offset(
                             x: -50,
@@ -1349,7 +1326,7 @@ private struct CassetteBayPlaceholder: View {
                             height: 25
                         )
                         .rotationEffect(
-                            .degrees(-rightAngle)
+                            .degrees(-reelAngle)
                         )
                         .offset(
                             x: 38,
@@ -1986,14 +1963,16 @@ private struct TransportPlaceholder: View {
 
                     transportButton(
                         "◀◀",
-                        isActive: false
+                        isActive: false,
+                        momentary: true
                     ) {
                         audio.previous()
                     }
 
                     transportButton(
                         "▶▶",
-                        isActive: false
+                        isActive: false,
+                        momentary: true
                     ) {
                         audio.next()
                     }
@@ -2012,7 +1991,12 @@ private struct TransportPlaceholder: View {
 
                     transportButton(
                         "■",
-                        isActive: false
+                        isActive:
+                            !audio.isPlaying
+                            && (
+                                audio.currentTrack == nil
+                                || audio.currentTime == 0
+                            )
                     ) {
                         audio.stop()
                     }
@@ -2054,112 +2038,131 @@ private struct TransportPlaceholder: View {
     private func transportButton(
         _ title: String,
         isActive: Bool,
+        momentary: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
 
-        Button(action: action) {
-
-            ZStack {
-
-                Rectangle()
-                    .fill(
-                        Color.black.opacity(
-                            isActive ? 0.95 : 0.85
-                        )
-                    )
-                    .offset(y: 2)
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors:
-                                isActive
-                                ? [
-                                    Color(white: 0.13),
-                                    Color(white: 0.095),
-                                    Color(white: 0.075)
-                                ]
-                                : [
-                                    Color(white: 0.22),
-                                    Color(white: 0.16),
-                                    Color(white: 0.12)
-                                ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-
-                Rectangle()
-                    .stroke(
-                        Color.white.opacity(
-                            isActive ? 0.06 : 0.16
-                        ),
-                        lineWidth: 1
-                    )
-                    .padding(1)
-
-                Rectangle()
-                    .stroke(
-                        Color.black.opacity(0.85),
-                        lineWidth: 1
-                    )
-                    .padding(3)
-
-                Text(title)
-                    .font(
-                        .system(
-                            size: title == "M" ? 9 : 11,
-                            weight: .medium,
-                            design: .monospaced
-                        )
-                    )
-                    .foregroundStyle(
-                        PanelMaterials.marking.opacity(
-                            isActive ? 0.55 : 0.82
-                        )
-                    )
-                    .offset(
-                        y: isActive ? 1 : -1
-                    )
-            }
-            .frame(
-                width: buttonWidth,
-                height: buttonHeight
-            )
+        Button(
+            action: action
+        ) {
+            Color.clear
         }
         .buttonStyle(
-            TransportButtonStyle()
+            TransportButtonStyle(
+                title: title,
+                isActive: isActive,
+                momentary: momentary,
+                buttonWidth: buttonWidth,
+                buttonHeight: buttonHeight
+            )
         )
     }
 }
 
 private struct TransportButtonStyle: ButtonStyle {
 
+    let title: String
+    let isActive: Bool
+    let momentary: Bool
+    let buttonWidth: CGFloat
+    let buttonHeight: CGFloat
+
     func makeBody(
         configuration: Configuration
     ) -> some View {
 
-        configuration.label
-            .scaleEffect(
+        let active =
+            momentary
+                ? configuration.isPressed
+                : isActive
+
+        ZStack {
+
+            Rectangle()
+                .fill(
+                    Color.black.opacity(
+                        active ? 0.92 : 0.82
+                    )
+                )
+                .offset(y: 2)
+
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors:
+                            active
+                            ? [
+                                Color(white: 0.13),
+                                Color(white: 0.095),
+                                Color(white: 0.075)
+                            ]
+                            : [
+                                Color(white: 0.22),
+                                Color(white: 0.16),
+                                Color(white: 0.12)
+                            ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Rectangle()
+                .stroke(
+                    Color.white.opacity(
+                        active ? 0.06 : 0.15
+                    ),
+                    lineWidth: 1
+                )
+                .padding(1)
+
+            Rectangle()
+                .stroke(
+                    Color.black.opacity(0.88),
+                    lineWidth: 1
+                )
+                .padding(3)
+
+            Text(title)
+                .font(
+                    .system(
+                        size: title == "M" ? 9 : 11,
+                        weight: .medium,
+                        design: .monospaced
+                    )
+                )
+                .foregroundStyle(
+                    active
+                        ? Color.green.opacity(0.95)
+                        : PanelMaterials.marking.opacity(0.82)
+                )
+                .offset(
+                    y: active ? 1 : -1
+                )
+        }
+        .frame(
+            width: buttonWidth,
+            height: buttonHeight
+        )
+        .scaleEffect(
+            configuration.isPressed
+                ? 0.97
+                : 1.0
+        )
+        .offset(
+            y:
                 configuration.isPressed
-                    ? 0.97
-                    : 1.0
-            )
-            .offset(
-                y:
-                    configuration.isPressed
-                    ? 2
-                    : 0
-            )
-            .brightness(
-                configuration.isPressed
-                    ? -0.025
-                    : 0
-            )
-            .animation(
-                .easeOut(duration: 0.06),
-                value: configuration.isPressed
-            )
+                ? 2
+                : 0
+        )
+        .brightness(
+            configuration.isPressed
+                ? -0.025
+                : 0
+        )
+        .animation(
+            .easeOut(duration: 0.06),
+            value: configuration.isPressed
+        )
     }
 }
 
@@ -2176,6 +2179,8 @@ private struct LowerButtonsPlaceholder: View {
         HStack(
             spacing: 4
         ) {
+
+            // EQ
 
             lowerButton(
                 active: audio.isEQEnabled
@@ -2195,20 +2200,25 @@ private struct LowerButtonsPlaceholder: View {
                     )
             }
 
+            // SH — Shuffle
+
             lowerButton(
                 active: audio.shuffle
             ) {
                 audio.shuffle.toggle()
             } content: {
 
-                ShuffleIcon(
-                    isActive: audio.shuffle
-                )
-                .frame(
-                    width: 22,
-                    height: 16
-                )
+                Text("SH")
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium,
+                            design: .monospaced
+                        )
+                    )
             }
+
+            // RP — Repeat
 
             lowerButton(
                 active: audio.repeatMode != 0
@@ -2222,29 +2232,34 @@ private struct LowerButtonsPlaceholder: View {
 
             } content: {
 
-                RepeatIcon(
-                    mode:
-                        audio.repeatMode == 0
-                            ? .off
-                            : audio.repeatMode == 1
-                                ? .one
-                                : .all
+                Text(
+                    audio.repeatMode == 0
+                        ? "RP"
+                        : audio.repeatMode == 1
+                            ? "RP1"
+                            : "RPA"
                 )
-                .frame(
-                    width: 22,
-                    height: 16
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .medium,
+                        design: .monospaced
+                    )
                 )
             }
+
+            // LB — Library
 
             lowerButton(
                 active: false
             ) {
 
-                // Library подключим позже.
+                // Library подключим здесь,
+                // когда вернём окно библиотеки.
 
             } content: {
 
-                Text("▦")
+                Text("LB")
                     .font(
                         .system(
                             size: 11,
@@ -2253,6 +2268,8 @@ private struct LowerButtonsPlaceholder: View {
                         )
                     )
             }
+
+            // PL — Playlist
 
             lowerButton(
                 active: showPlaylist
@@ -2348,9 +2365,9 @@ private struct LowerButtonsPlaceholder: View {
 
                 content()
                     .foregroundStyle(
-                        PanelMaterials.marking.opacity(
-                            active ? 0.58 : 0.82
-                        )
+                        active
+                            ? Color.green.opacity(0.95)
+                            : PanelMaterials.marking.opacity(0.82)
                     )
                     .offset(
                         y: active ? 1 : -1
@@ -2396,6 +2413,7 @@ private struct LowerButtonStyle: ButtonStyle {
             )
     }
 }
+
 
 // MARK: - Volume
 
