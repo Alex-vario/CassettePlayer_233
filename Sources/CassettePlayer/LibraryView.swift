@@ -1209,169 +1209,187 @@ private struct ArtistTile: View {
 
     var body: some View {
 
-        GeometryReader { geometry in
+        ZStack(
+            alignment: .topTrailing
+        ) {
 
-            let side =
-                max(
-                    1,
-                    geometry.size.width
-                )
+            artistMainButton
 
-            ZStack(
-                alignment: .topTrailing
-            ) {
-
-                Button(
-                    action: onOpen
-                ) {
-
-                    ZStack(
-                        alignment: .bottomLeading
-                    ) {
-
-                        Color.black.opacity(
-                            0.52
-                        )
-
-                        if let artwork =
-                            artist.artwork {
-
-                            Image(
-                                nsImage: artwork
-                            )
-                            .resizable()
-                            .aspectRatio(
-                                contentMode: .fill
-                            )
-                            .frame(
-                                width: side,
-                                height: side
-                            )
-                            .clipped()
-
-                        } else {
-
-                            artistPlaceholder
-                                .frame(
-                                    width: side,
-                                    height: side
-                                )
-                        }
-
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                Color.black.opacity(
-                                    0.82
-                                )
-                            ],
-                            startPoint: .center,
-                            endPoint: .bottom
-                        )
-                        .frame(
-                            width: side,
-                            height: side
-                        )
-
-                        Text(
-                            artist.name
-                        )
-                        .font(
-                            .system(
-                                size: 12,
-                                weight: .medium,
-                                design: .monospaced
-                            )
-                        )
-                        .foregroundStyle(
-                            Color.white.opacity(
-                                0.92
-                            )
-                        )
-                        .lineLimit(1)
-                        .padding(
-                            .horizontal,
-                            8
-                        )
-                        .frame(
-                            width: side,
-                            height: 27,
-                            alignment: .leading
-                        )
-                        .background(
-                            Color.black.opacity(
-                                0.58
-                            )
-                        )
-                    }
-                    .frame(
-                        width: side,
-                        height: side
-                    )
-                    .clipped()
-                    .overlay {
-
-                        Rectangle()
-                            .stroke(
-                                Color.black.opacity(
-                                    0.9
-                                ),
-                                lineWidth: 1
-                            )
-                    }
-                }
-                .buttonStyle(
-                    FolderTileButtonStyle()
-                )
-
-                Button(
-                    action: onPlay
-                ) {
-
-                    Text("▶")
-                        .font(
-                            .system(
-                                size: 12,
-                                weight: .medium,
-                                design: .monospaced
-                            )
-                        )
-                        .foregroundStyle(
-                            Color.green.opacity(
-                                0.95
-                            )
-                        )
-                        .frame(
-                            width: 28,
-                            height: 28
-                        )
-                        .background(
-                            Color.black.opacity(
-                                0.72
-                            )
-                        )
-                        .overlay {
-
-                            Rectangle()
-                                .stroke(
-                                    Color.white.opacity(
-                                        0.12
-                                    ),
-                                    lineWidth: 1
-                                )
-                        }
-                }
-                .buttonStyle(
-                    FolderPlayButtonStyle()
-                )
+            artistPlayButton
                 .padding(6)
-            }
         }
         .aspectRatio(
             1,
             contentMode: .fit
         )
-        .clipped()
+    }
+
+    private var artistMainButton: some View {
+
+        Button(
+            action: onOpen
+        ) {
+
+            ZStack(
+                alignment: .bottomLeading
+            ) {
+
+                artistArtwork
+
+                artistBottomLabel
+            }
+            .contentShape(
+                Rectangle()
+            )
+            .overlay {
+
+                Rectangle()
+                    .stroke(
+                        Color.black.opacity(0.9),
+                        lineWidth: 1
+                    )
+            }
+            .clipped()
+        }
+        .buttonStyle(
+            FolderTileButtonStyle()
+        )
+    }
+
+    private var artistArtwork: some View {
+
+        GeometryReader { geometry in
+
+            let side = max(
+                1,
+                geometry.size.width
+            )
+
+            ZStack {
+
+                Color.black.opacity(
+                    0.52
+                )
+
+                if let artwork =
+                    artist.artwork {
+
+                    Image(
+                        nsImage: artwork
+                    )
+                    .resizable()
+                    .aspectRatio(
+                        contentMode: .fill
+                    )
+                    .frame(
+                        width: side,
+                        height: side
+                    )
+                    .clipped()
+
+                } else {
+
+                    artistPlaceholder
+                        .frame(
+                            width: side,
+                            height: side
+                        )
+                }
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(
+                            0.82
+                        )
+                    ],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .frame(
+                    width: side,
+                    height: side
+                )
+            }
+            .frame(
+                width: side,
+                height: side
+            )
+            .clipped()
+        }
+    }
+
+    private var artistBottomLabel: some View {
+
+        Text(
+            artist.name
+        )
+        .font(
+            .system(
+                size: 12,
+                weight: .medium,
+                design: .monospaced
+            )
+        )
+        .foregroundStyle(
+            Color.white.opacity(0.92)
+        )
+        .lineLimit(1)
+        .padding(
+            .horizontal,
+            8
+        )
+        .frame(
+            height: 27,
+            alignment: .leading
+        )
+        .frame(
+            maxWidth: .infinity
+        )
+        .background(
+            Color.black.opacity(0.58)
+        )
+    }
+
+    private var artistPlayButton: some View {
+
+        Button(
+            action: onPlay
+        ) {
+
+            Text("▶")
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .medium,
+                        design: .monospaced
+                    )
+                )
+                .foregroundStyle(
+                    Color.green.opacity(0.95)
+                )
+                .frame(
+                    width: 28,
+                    height: 28
+                )
+                .background(
+                    Color.black.opacity(0.72)
+                )
+                .overlay {
+
+                    Rectangle()
+                        .stroke(
+                            Color.white.opacity(0.12),
+                            lineWidth: 1
+                        )
+                }
+                .contentShape(
+                    Rectangle()
+                )
+        }
+        .buttonStyle(
+            FolderPlayButtonStyle()
+        )
     }
 
     private var artistPlaceholder: some View {
