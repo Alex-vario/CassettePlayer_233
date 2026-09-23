@@ -14,6 +14,10 @@ struct LibraryView: View {
     @State private var selectedRoot: URL?
     @State private var isLoading = false
 
+    @State private var libraryMode = 0
+    @State private var artists: [ArtistGroup] = []
+    @State private var selectedArtist: ArtistGroup?
+
     private let rootDefaultsKey =
         "CassettePlayer.Library.Root"
 
@@ -48,14 +52,28 @@ struct LibraryView: View {
 
             modeButton(
                 title: "ПАПКИ",
-                active: true
+                active: libraryMode == 0
             ) {
+
+                libraryMode = 0
+                selectedArtist = nil
+
+                if let folder = currentFolder {
+                    reloadFolder(folder)
+                } else if let root = selectedRoot {
+                    currentFolder = root
+                    reloadFolder(root)
+                }
             }
 
             modeButton(
                 title: "ИСПОЛНИТЕЛИ",
-                active: false
+                active: libraryMode == 1
             ) {
+
+                libraryMode = 1
+                selectedArtist = nil
+                loadArtists()
             }
 
             Rectangle()
@@ -148,7 +166,26 @@ struct LibraryView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Breadcrumbs
+
     private var breadcrumbInline: some View {
+
+        HStack(spacing: 5) {
+
+            if libraryMode == 0 {
+
+                folderBreadcrumbs
+
+            } else {
+
+                artistBreadcrumbs
+            }
+        }
+        .lineLimit(1)
+        .clipped()
+    }
+
+    private var folderBreadcrumbs: some View {
 
         HStack(spacing: 5) {
 
@@ -173,11 +210,9 @@ struct LibraryView: View {
                         )
                     )
                     .foregroundStyle(
-                        Color.white.opacity(
-                            currentFolder == root
-                                ? 0.92
-                                : 0.60
-                        )
+                        currentFolder == root
+                            ? Color.white.opacity(0.92)
+                            : Color.white.opacity(0.60)
                     )
                     .lineLimit(1)
                 }
@@ -230,9 +265,7 @@ struct LibraryView: View {
                                 )
                             )
                             .foregroundStyle(
-                                Color.white.opacity(
-                                    0.78
-                                )
+                                Color.white.opacity(0.78)
                             )
                             .lineLimit(1)
                         }
@@ -241,8 +274,78 @@ struct LibraryView: View {
                 }
             }
         }
-        .lineLimit(1)
-        .clipped()
+    }
+
+    private var artistBreadcrumbs: some View {
+
+        HStack(spacing: 5) {
+
+            if selectedArtist != nil {
+
+                Button {
+
+                    selectedArtist = nil
+
+                } label: {
+
+                    Text("ИСПОЛНИТЕЛИ")
+                        .font(
+                            .system(
+                                size: 10,
+                                weight: .medium,
+                                design: .monospaced
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(0.60)
+                        )
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+
+                Text("›")
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .regular,
+                            design: .monospaced
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(0.32)
+                    )
+
+                Text(
+                    selectedArtist?.name ?? ""
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .medium,
+                        design: .monospaced
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.92)
+                )
+                .lineLimit(1)
+
+            } else {
+
+                Text("ИСПОЛНИТЕЛИ")
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .medium,
+                            design: .monospaced
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(0.92)
+                    )
+                    .lineLimit(1)
+            }
+        }
     }
 
     // MARK: - Content
@@ -256,27 +359,38 @@ struct LibraryView: View {
                 ProgressView()
                     .controlSize(.small)
 
+            } else if libraryMode == 0 {
+
+                folderContent
+
             } else {
 
-                ScrollView {
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-
-                        folderGrid
-
-                        if !rootFiles.isEmpty {
-
-                            tracksSection
-                        }
-                    }
-                    .padding(12)
-                }
-                .scrollIndicators(.hidden)
+                artistContent
             }
         }
+    }
+
+    // MARK: - Folder Content
+
+    private var folderContent: some View {
+
+        ScrollView {
+
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+
+                folderGrid
+
+                if !rootFiles.isEmpty {
+
+                    tracksSection
+                }
+            }
+            .padding(12)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var folderGrid: some View {
@@ -312,7 +426,132 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: - Root files
+    // MARK: - Artist Content
+
+    private var artistContent: some View {
+
+        ScrollView {
+
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+
+                if let artist = selectedArtist {
+
+                    artistTracksSection(
+                        artist
+                    )
+
+                } else {
+
+                    artistGrid
+                }
+            }
+            .padding(12)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var artistGrid: some View {
+
+        LazyVGrid(
+            columns: [
+                GridItem(
+                    .adaptive(
+                        minimum: 118,
+                        maximum: 165
+                    ),
+                    spacing: 10
+                )
+            ],
+            spacing: 10
+        ) {
+
+            ForEach(
+                artists
+            ) { artist in
+
+                ArtistTile(
+                    artist: artist,
+                    onOpen: {
+
+                        selectedArtist = artist
+
+                    },
+                    onPlay: {
+
+                        playArtist(
+                            artist
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    private func artistTracksSection(
+        _ artist: ArtistGroup
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+
+            HStack {
+
+                Text(
+                    artist.name
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .medium,
+                        design: .monospaced
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.82)
+                )
+
+                Spacer()
+
+                Text(
+                    "\(artist.tracks.count)"
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .medium,
+                        design: .monospaced
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.55)
+                )
+            }
+
+            ForEach(
+                artist.tracks
+            ) { track in
+
+                TrackRow(
+                    url: track.url,
+                    isCurrent:
+                        audio.currentTrack?.url == track.url,
+                    onPlay: {
+                        playArtistFile(
+                            track,
+                            artist: artist
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Root Files
 
     private var tracksSection: some View {
 
@@ -369,7 +608,7 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: - Folder navigation
+    // MARK: - Folder Navigation
 
     private func openFolder(
         _ folder: URL
@@ -410,7 +649,7 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: - Folder playback
+    // MARK: - Folder Playback
 
     private func playFolder(
         _ folder: URL
@@ -460,16 +699,129 @@ struct LibraryView: View {
         onClose()
     }
 
-    // MARK: - Recursive audio collection
+    // MARK: - Artist Loading
+
+    private func loadArtists() {
+
+        guard let root = selectedRoot else {
+            artists = []
+            return
+        }
+
+        isLoading = true
+
+        Task {
+
+            let tracks =
+                await Task.detached(
+                    priority: .userInitiated
+                ) {
+                    Self.collectAudioTracksStatic(
+                        in: root
+                    )
+                }
+                .value
+
+            var grouped:
+                [String: [AudioTrack]] = [:]
+
+            for track in tracks {
+
+                let artist =
+                    track.artist
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+
+                let name =
+                    artist.isEmpty
+                        ? "Неизвестный исполнитель"
+                        : artist
+
+                grouped[name, default: []].append(
+                    track
+                )
+            }
+
+            artists =
+                grouped.map { name, tracks in
+
+                    ArtistGroup(
+                        name: name,
+                        tracks:
+                            tracks.sorted {
+                                $0.title.localizedStandardCompare(
+                                    $1.title
+                                ) == .orderedAscending
+                            }
+                    )
+                }
+                .sorted {
+
+                    $0.name.localizedCaseInsensitiveCompare(
+                        $1.name
+                    ) == .orderedAscending
+                }
+
+            isLoading = false
+        }
+    }
+
+    private func playArtist(
+        _ artist: ArtistGroup
+    ) {
+
+        guard !artist.tracks.isEmpty else {
+            return
+        }
+
+        audio.setPlaylist(
+            artist.tracks
+        )
+
+        audio.play(
+            artist.tracks[0]
+        )
+
+        onClose()
+    }
+
+    private func playArtistFile(
+        _ track: AudioTrack,
+        artist: ArtistGroup
+    ) {
+
+        audio.setPlaylist(
+            artist.tracks
+        )
+
+        audio.play(
+            track
+        )
+
+        onClose()
+    }
+
+    // MARK: - Recursive Audio Collection
 
     private func collectAudioTracks(
+        in folder: URL
+    ) -> [AudioTrack] {
+
+        Self.collectAudioTracksStatic(
+            in: folder
+        )
+    }
+
+    private nonisolated static func collectAudioTracksStatic(
         in folder: URL
     ) -> [AudioTrack] {
 
         let fm =
             FileManager.default
 
-        var result: [AudioTrack] = []
+        var result:
+            [AudioTrack] = []
 
         let audioExtensions: Set<String> = [
             "mp3",
@@ -550,7 +902,7 @@ struct LibraryView: View {
         return result
     }
 
-    // MARK: - Root chooser
+    // MARK: - Root Chooser
 
     private func chooseLibraryFolder() {
 
@@ -576,9 +928,19 @@ struct LibraryView: View {
             forKey: rootDefaultsKey
         )
 
-        openFolder(
-            url
-        )
+        currentFolder = url
+        selectedArtist = nil
+
+        if libraryMode == 0 {
+
+            openFolder(
+                url
+            )
+
+        } else {
+
+            loadArtists()
+        }
     }
 
     private func loadSavedRoot() {
@@ -607,9 +969,16 @@ struct LibraryView: View {
 
         selectedRoot = url
 
-        openFolder(
-            url
-        )
+        if libraryMode == 0 {
+
+            openFolder(
+                url
+            )
+
+        } else {
+
+            loadArtists()
+        }
     }
 
     // MARK: - Breadcrumbs
@@ -726,8 +1095,11 @@ struct LibraryView: View {
             "opus"
         ]
 
-        var foundFolders: [URL] = []
-        var foundFiles: [URL] = []
+        var foundFolders:
+            [URL] = []
+
+        var foundFiles:
+            [URL] = []
 
         for item in items {
 
@@ -775,6 +1147,247 @@ struct LibraryView: View {
         return FolderScanResult(
             folders: foundFolders,
             files: foundFiles
+        )
+    }
+}
+
+// MARK: - Artist Group
+
+private struct ArtistGroup:
+    Identifiable,
+    Hashable {
+
+    let id = UUID()
+    let name: String
+    let tracks: [AudioTrack]
+
+    var artwork: NSImage? {
+
+        for track in tracks {
+
+            if let data = track.artwork,
+               let image = NSImage(data: data)
+            {
+                return image
+            }
+        }
+
+        return nil
+    }
+
+    static func == (
+        lhs: ArtistGroup,
+        rhs: ArtistGroup
+    ) -> Bool {
+
+        lhs.name == rhs.name
+        && lhs.tracks.map(\.url)
+            == rhs.tracks.map(\.url)
+    }
+
+    func hash(
+        into hasher: inout Hasher
+    ) {
+
+        hasher.combine(name)
+
+        for track in tracks {
+
+            hasher.combine(track.url)
+        }
+    }
+}
+
+// MARK: - Artist Tile
+
+private struct ArtistTile: View {
+
+    let artist: ArtistGroup
+
+    let onOpen: () -> Void
+    let onPlay: () -> Void
+
+    var body: some View {
+
+        GeometryReader { geometry in
+
+            let side =
+                max(
+                    1,
+                    geometry.size.width
+                )
+
+            ZStack(
+                alignment: .topTrailing
+            ) {
+
+                Button(
+                    action: onOpen
+                ) {
+
+                    ZStack(
+                        alignment: .bottomLeading
+                    ) {
+
+                        Color.black.opacity(
+                            0.52
+                        )
+
+                        if let artwork =
+                            artist.artwork {
+
+                            Image(
+                                nsImage: artwork
+                            )
+                            .resizable()
+                            .aspectRatio(
+                                contentMode: .fill
+                            )
+                            .frame(
+                                width: side,
+                                height: side
+                            )
+                            .clipped()
+
+                        } else {
+
+                            artistPlaceholder
+                                .frame(
+                                    width: side,
+                                    height: side
+                                )
+                        }
+
+                        LinearGradient(
+                            colors: [
+                                Color.clear,
+                                Color.black.opacity(
+                                    0.82
+                                )
+                            ],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
+                        .frame(
+                            width: side,
+                            height: side
+                        )
+
+                        Text(
+                            artist.name
+                        )
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .medium,
+                                design: .monospaced
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.92
+                            )
+                        )
+                        .lineLimit(1)
+                        .padding(
+                            .horizontal,
+                            8
+                        )
+                        .frame(
+                            width: side,
+                            height: 27,
+                            alignment: .leading
+                        )
+                        .background(
+                            Color.black.opacity(
+                                0.58
+                            )
+                        )
+                    }
+                    .frame(
+                        width: side,
+                        height: side
+                    )
+                    .clipped()
+                    .overlay {
+
+                        Rectangle()
+                            .stroke(
+                                Color.black.opacity(
+                                    0.9
+                                ),
+                                lineWidth: 1
+                            )
+                    }
+                }
+                .buttonStyle(
+                    FolderTileButtonStyle()
+                )
+
+                Button(
+                    action: onPlay
+                ) {
+
+                    Text("▶")
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .medium,
+                                design: .monospaced
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.green.opacity(
+                                0.95
+                            )
+                        )
+                        .frame(
+                            width: 28,
+                            height: 28
+                        )
+                        .background(
+                            Color.black.opacity(
+                                0.72
+                            )
+                        )
+                        .overlay {
+
+                            Rectangle()
+                                .stroke(
+                                    Color.white.opacity(
+                                        0.12
+                                    ),
+                                    lineWidth: 1
+                                )
+                        }
+                }
+                .buttonStyle(
+                    FolderPlayButtonStyle()
+                )
+                .padding(6)
+            }
+        }
+        .aspectRatio(
+            1,
+            contentMode: .fit
+        )
+        .clipped()
+    }
+
+    private var artistPlaceholder: some View {
+
+        Image(
+            systemName:
+                "person.2.fill"
+        )
+        .font(
+            .system(
+                size: 38,
+                weight: .regular
+            )
+        )
+        .foregroundStyle(
+            Color.white.opacity(0.18)
         )
     }
 }
@@ -958,7 +1571,7 @@ private struct FolderTile: View {
     }
 }
 
-// MARK: - Folder title
+// MARK: - Folder Title
 
 private struct FolderTitleScroller: View {
 
