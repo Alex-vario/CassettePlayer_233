@@ -77,6 +77,20 @@ EOF
 
 chmod +x "$MACOS_DIR/$APP_NAME"
 
+# Remove Finder metadata copied with image resources; codesign rejects it.
+xattr -cr "$APP_DIR"
+
+# Sign the completed app bundle with its declared bundle identifier.
+# The explicit designated requirement keeps TCC permissions associated
+# with the app across local rebuilds, even without a Developer ID identity.
+codesign \
+    --force \
+    --deep \
+    --sign - \
+    --identifier "$BUNDLE_ID" \
+    --requirements "=designated => identifier \"$BUNDLE_ID\"" \
+    "$APP_DIR"
+
 echo ""
 echo "=== Готово ==="
 echo "$APP_DIR"
