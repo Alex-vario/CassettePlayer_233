@@ -24,108 +24,179 @@ final class AudioPlayer: NSObject, ObservableObject {
 
     @Published private(set) var isEQEnabled = false
 
+    // MARK: - Cassette
+
+    @Published private(set) var cassetteName: String = "cassette"
+
+    private let cassetteNames = [
+        "cassette",
+        "cassette_02",
+        "cassette_03",
+        "cassette_04",
+        "cassette_05",
+        "cassette_06",
+        "cassette_07"
+    ]
+
+    func changeCassette() {
+
+        guard cassetteNames.count > 1 else {
+            return
+        }
+
+        var newCassette = cassetteName
+
+        while newCassette == cassetteName {
+
+            newCassette =
+                cassetteNames.randomElement()
+                ?? "cassette"
+        }
+
+        cassetteName = newCassette
+    }
+
+    private func selectRandomCassette() {
+
+        cassetteName =
+            cassetteNames.randomElement()
+            ?? "cassette"
+    }
+
     // MARK: - Playlist
 
     @Published private(set) var playlist: [AudioTrack] = []
     private var currentIndex: Int = 0
 
-// MARK: - Playlist management
+    // MARK: - Playlist management
 
-func addToPlaylist(_ track: AudioTrack) {
-    guard !playlist.contains(track) else {
-        return
+    func addToPlaylist(_ track: AudioTrack) {
+
+        guard !playlist.contains(track) else {
+            return
+        }
+
+        playlist.append(track)
+
+        if currentTrack == nil {
+
+            currentIndex =
+                playlist.count - 1
+
+            currentTrack = track
+        }
     }
 
-    playlist.append(track)
+    func addToPlaylist(_ tracks: [AudioTrack]) {
 
-    if currentTrack == nil {
-        currentIndex = playlist.count - 1
-        currentTrack = track
-    }
-}
-
-func addToPlaylist(_ tracks: [AudioTrack]) {
-    for track in tracks {
-        addToPlaylist(track)
-    }
-}
-
-func removeFromPlaylist(_ track: AudioTrack) {
-    guard let index = playlist.firstIndex(of: track) else {
-        return
+        for track in tracks {
+            addToPlaylist(track)
+        }
     }
 
-    let wasCurrent =
-        currentTrack?.url == track.url
+    func removeFromPlaylist(
+        _ track: AudioTrack
+    ) {
 
-    playlist.remove(at: index)
+        guard
+            let index =
+                playlist.firstIndex(
+                    of: track
+                )
+        else {
+            return
+        }
 
-    if playlist.isEmpty {
-        currentIndex = 0
-        playerNode.stop()
-        stopTimer()
+        let wasCurrent =
+            currentTrack?.url == track.url
 
-        currentTrack = nil
-        currentFile = nil
-
-        currentTime = 0
-        duration = 0
-        bitrate = 0
-
-        pausedTime = 0
-        playbackStartTime = nil
-        isPlaying = false
-
-        return
-    }
-
-    if index < currentIndex {
-        currentIndex -= 1
-    }
-
-    currentIndex =
-        min(
-            currentIndex,
-            playlist.count - 1
+        playlist.remove(
+            at: index
         )
 
-    if wasCurrent {
-        playerNode.stop()
-        stopTimer()
+        if playlist.isEmpty {
 
-        currentTrack = nil
-        currentFile = nil
+            currentIndex = 0
 
-        currentTime = 0
-        duration = 0
-        bitrate = 0
+            playerNode.stop()
+            stopTimer()
 
-        pausedTime = 0
-        playbackStartTime = nil
-        isPlaying = false
+            currentTrack = nil
+            currentFile = nil
 
-        currentTrack =
-            playlist[currentIndex]
+            currentTime = 0
+            duration = 0
+            bitrate = 0
+
+            pausedTime = 0
+            playbackStartTime = nil
+            isPlaying = false
+
+            return
+        }
+
+        if index < currentIndex {
+            currentIndex -= 1
+        }
+
+        currentIndex =
+            min(
+                currentIndex,
+                playlist.count - 1
+            )
+
+        if wasCurrent {
+
+            playerNode.stop()
+            stopTimer()
+
+            currentTrack = nil
+            currentFile = nil
+
+            currentTime = 0
+            duration = 0
+            bitrate = 0
+
+            pausedTime = 0
+            playbackStartTime = nil
+            isPlaying = false
+
+            currentTrack =
+                playlist[currentIndex]
+        }
     }
-}
 
     // MARK: - Audio engine
 
-    private let engine = AVAudioEngine()
-    private let playerNode = AVAudioPlayerNode()
-    private let eq = AVAudioUnitEQ(numberOfBands: 11)
+    private let engine =
+        AVAudioEngine()
 
-    private var currentFile: AVAudioFile?
+    private let playerNode =
+        AVAudioPlayerNode()
+
+    private let eq =
+        AVAudioUnitEQ(
+            numberOfBands: 11
+        )
+
+    private var currentFile:
+        AVAudioFile?
 
     // MARK: - Playback timer
 
-    private var playbackTimer: DispatchSourceTimer?
-    private var playbackGeneration = 0
+    private var playbackTimer:
+        DispatchSourceTimer?
+
+    private var playbackGeneration =
+        0
 
     // MARK: - Playback time
 
-    private var playbackStartTime: Date?
-    private var pausedTime: TimeInterval = 0
+    private var playbackStartTime:
+        Date?
+
+    private var pausedTime:
+        TimeInterval = 0
 
     // MARK: - EQ
 
@@ -143,12 +214,16 @@ func removeFromPlaylist(_ track: AudioTrack) {
         18000
     ]
 
-    private let eqDefaultsKey = "CassettePlayer.EQ.Gains"
-    private let eqEnabledDefaultsKey = "CassettePlayer.EQ.Enabled"
+    private let eqDefaultsKey =
+        "CassettePlayer.EQ.Gains"
+
+    private let eqEnabledDefaultsKey =
+        "CassettePlayer.EQ.Enabled"
 
     // MARK: - Init
 
     override init() {
+
         super.init()
 
         setupAudioEngine()
@@ -156,6 +231,7 @@ func removeFromPlaylist(_ track: AudioTrack) {
     }
 
     deinit {
+
         stopTimer()
         playerNode.stop()
         engine.stop()
@@ -165,18 +241,36 @@ func removeFromPlaylist(_ track: AudioTrack) {
 
     private func setupAudioEngine() {
 
-        engine.attach(playerNode)
-        engine.attach(eq)
+        engine.attach(
+            playerNode
+        )
 
-        for (index, frequency) in frequencies.enumerated() {
+        engine.attach(
+            eq
+        )
 
-            let filter = eq.bands[index]
+        for (
+            index,
+            frequency
+        ) in frequencies.enumerated() {
 
-            filter.filterType = .parametric
-            filter.frequency = frequency
-            filter.bandwidth = 1.0
-            filter.gain = 0
-            filter.bypass = true
+            let filter =
+                eq.bands[index]
+
+            filter.filterType =
+                .parametric
+
+            filter.frequency =
+                frequency
+
+            filter.bandwidth =
+                1.0
+
+            filter.gain =
+                0
+
+            filter.bypass =
+                true
         }
 
         engine.connect(
@@ -191,13 +285,17 @@ func removeFromPlaylist(_ track: AudioTrack) {
             format: nil
         )
 
-        engine.mainMixerNode.outputVolume = volume
+        engine.mainMixerNode.outputVolume =
+            volume
 
         installLevelMeter()
 
         do {
+
             try engine.start()
+
         } catch {
+
             print(
                 "Audio engine start error:",
                 error
@@ -209,7 +307,8 @@ func removeFromPlaylist(_ track: AudioTrack) {
 
     private func installLevelMeter() {
 
-        let mixer = engine.mainMixerNode
+        let mixer =
+            engine.mainMixerNode
 
         mixer.removeTap(
             onBus: 0
@@ -218,7 +317,10 @@ func removeFromPlaylist(_ track: AudioTrack) {
         mixer.installTap(
             onBus: 0,
             bufferSize: 1024,
-            format: mixer.outputFormat(forBus: 0)
+            format:
+                mixer.outputFormat(
+                    forBus: 0
+                )
         ) { [weak self] buffer, _ in
 
             guard let self else {
@@ -226,16 +328,21 @@ func removeFromPlaylist(_ track: AudioTrack) {
             }
 
             guard
-                let channelData = buffer.floatChannelData
+                let channelData =
+                    buffer.floatChannelData
             else {
                 return
             }
 
             let channelCount =
-                Int(buffer.format.channelCount)
+                Int(
+                    buffer.format.channelCount
+                )
 
             let frameCount =
-                Int(buffer.frameLength)
+                Int(
+                    buffer.frameLength
+                )
 
             guard frameCount > 0 else {
                 return
@@ -249,18 +356,21 @@ func removeFromPlaylist(_ track: AudioTrack) {
                 let left =
                     channelData[0][frame]
 
-                leftSum += left * left
+                leftSum +=
+                    left * left
 
                 if channelCount > 1 {
 
                     let right =
                         channelData[1][frame]
 
-                    rightSum += right * right
+                    rightSum +=
+                        right * right
 
                 } else {
 
-                    rightSum += left * left
+                    rightSum +=
+                        left * left
                 }
             }
 
@@ -295,18 +405,27 @@ func removeFromPlaylist(_ track: AudioTrack) {
 
     // MARK: - Playlist
 
-    func setPlaylist(_ tracks: [AudioTrack]) {
+    func setPlaylist(
+        _ tracks: [AudioTrack]
+    ) {
 
-        playlist = tracks
+        playlist =
+            tracks
+
+        // Каждый новый playlist получает
+        // новую случайную кассету.
+        selectRandomCassette()
 
         if playlist.isEmpty {
 
             currentIndex = 0
+
             currentTrack = nil
             currentFile = nil
 
             duration = 0
             currentTime = 0
+
             pausedTime = 0
             playbackStartTime = nil
 
@@ -315,41 +434,51 @@ func removeFromPlaylist(_ track: AudioTrack) {
             return
         }
 
-        if currentIndex >= playlist.count {
-            currentIndex = 0
-        }
+        currentIndex = 0
 
-        if currentTrack == nil {
-            currentTrack = playlist[currentIndex]
-        }
+        currentTrack =
+            playlist[currentIndex]
     }
-
-
 
     // MARK: - Playback
 
-    func play(_ track: AudioTrack) {
+    func play(
+        _ track: AudioTrack
+    ) {
 
-        guard let index = playlist.firstIndex(of: track)
+        guard
+            let index =
+                playlist.firstIndex(
+                    of: track
+                )
         else {
 
             playlist = [track]
             currentIndex = 0
 
-            startTrack(track)
+            startTrack(
+                track
+            )
 
             return
         }
 
-        currentIndex = index
+        currentIndex =
+            index
 
-        startTrack(track)
+        startTrack(
+            track
+        )
     }
 
-    private func startTrack(_ track: AudioTrack) {
+    private func startTrack(
+        _ track: AudioTrack
+    ) {
 
         playbackGeneration += 1
-        let generation = playbackGeneration
+
+        let generation =
+            playbackGeneration
 
         playerNode.stop()
         stopTimer()
@@ -358,34 +487,49 @@ func removeFromPlaylist(_ track: AudioTrack) {
 
             let file =
                 try AVAudioFile(
-                    forReading: track.url
+                    forReading:
+                        track.url
                 )
 
-            currentFile = file
-            currentTrack = track
-            bitrate = 0
+            currentFile =
+                file
+
+            currentTrack =
+                track
+
+            bitrate =
+                0
 
             loadBitrate(
                 for: track.url
             )
 
             let sampleRate =
-                file.processingFormat.sampleRate
+                file.processingFormat
+                    .sampleRate
 
             if sampleRate > 0 {
 
                 duration =
-                    Double(file.length) / sampleRate
+                    Double(
+                        file.length
+                    )
+                    / sampleRate
 
             } else {
 
-                duration = 0
+                duration =
+                    0
             }
 
-            currentTime = 0
-            pausedTime = 0
+            currentTime =
+                0
 
-            playbackStartTime = Date()
+            pausedTime =
+                0
+
+            playbackStartTime =
+                Date()
 
             print(
                 "Playing:",
@@ -413,7 +557,9 @@ func removeFromPlaylist(_ track: AudioTrack) {
                         return
                     }
 
-                    guard self.playbackGeneration == generation
+                    guard
+                        self.playbackGeneration
+                        == generation
                     else {
                         return
                     }
@@ -429,7 +575,8 @@ func removeFromPlaylist(_ track: AudioTrack) {
 
             playerNode.play()
 
-            isPlaying = true
+            isPlaying =
+                true
 
             startTimer()
 
@@ -440,124 +587,140 @@ func removeFromPlaylist(_ track: AudioTrack) {
                 error
             )
 
-            isPlaying = false
+            isPlaying =
+                false
         }
     }
 
-private func loadBitrate(
-    for url: URL
-) {
+    private func loadBitrate(
+        for url: URL
+    ) {
 
-    Task {
+        Task {
 
-        let asset =
-            AVURLAsset(
-                url: url
-            )
-
-        var calculatedBitrate: Int = 0
-
-        if
-            let tracks =
-                try? await asset.load(
-                    .tracks
-                ),
-            let audioTrack =
-                tracks.first(
-                    where: {
-                        $0.mediaType == .audio
-                    }
-                ),
-            let dataRate =
-                try? await audioTrack.load(
-                    .estimatedDataRate
-                ),
-            dataRate > 0
-        {
-
-            calculatedBitrate =
-                Int(
-                    (dataRate / 1000)
-                        .rounded()
+            let asset =
+                AVURLAsset(
+                    url: url
                 )
-        }
 
-        if calculatedBitrate <= 0 {
+            var calculatedBitrate:
+                Int = 0
 
             if
-                let duration =
+                let tracks =
                     try? await asset.load(
-                        .duration
-                    )
+                        .tracks
+                    ),
+                let audioTrack =
+                    tracks.first(
+                        where: {
+                            $0.mediaType
+                            == .audio
+                        }
+                    ),
+                let dataRate =
+                    try? await audioTrack.load(
+                        .estimatedDataRate
+                    ),
+                dataRate > 0
             {
 
-                let seconds =
-                    duration.seconds
-
-                if seconds > 0 {
-
-                    do {
-
-                        let attributes =
-                            try FileManager.default.attributesOfItem(
-                                atPath: url.path
-                            )
-
-                        if let fileSize =
-                            attributes[
-                                .size
-                            ] as? NSNumber
-                        {
-
-                            let bits =
-                                fileSize.doubleValue * 8.0
-
-                            calculatedBitrate =
-                                Int(
-                                    (bits / seconds / 1000.0)
-                                        .rounded()
-                                )
-                        }
-
-                    } catch {
-
-                        print(
-                            "Cannot determine file size:",
-                            error
+                calculatedBitrate =
+                    Int(
+                        (
+                            dataRate
+                            / 1000
                         )
+                        .rounded()
+                    )
+            }
+
+            if calculatedBitrate <= 0 {
+
+                if
+                    let duration =
+                        try? await asset.load(
+                            .duration
+                        )
+                {
+
+                    let seconds =
+                        duration.seconds
+
+                    if seconds > 0 {
+
+                        do {
+
+                            let attributes =
+                                try FileManager.default
+                                    .attributesOfItem(
+                                        atPath:
+                                            url.path
+                                    )
+
+                            if let fileSize =
+                                attributes[
+                                    .size
+                                ] as? NSNumber {
+
+                                let bits =
+                                    fileSize.doubleValue
+                                    * 8.0
+
+                                calculatedBitrate =
+                                    Int(
+                                        (
+                                            bits
+                                            / seconds
+                                            / 1000.0
+                                        )
+                                        .rounded()
+                                    )
+                            }
+
+                        } catch {
+
+                            print(
+                                "Cannot determine file size:",
+                                error
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        let resultBitrate =
-            calculatedBitrate
+            let resultBitrate =
+                calculatedBitrate
 
-        await MainActor.run {
+            await MainActor.run {
 
-            guard
-                let track =
-                    self.currentTrack
-            else {
-                return
+                guard
+                    let track =
+                        self.currentTrack
+                else {
+                    return
+                }
+
+                guard
+                    track.url == url
+                else {
+                    return
+                }
+
+                self.bitrate =
+                    resultBitrate
             }
-
-            guard
-                track.url == url
-            else {
-                return
-            }
-
-            self.bitrate =
-                resultBitrate
         }
     }
-}
+
     func togglePlayPause() {
 
         if isPlaying {
+
             pause()
+
         } else {
+
             resume()
         }
     }
@@ -570,10 +733,14 @@ private func loadBitrate(
 
         playerNode.pause()
 
-        pausedTime = currentTime
-        playbackStartTime = nil
+        pausedTime =
+            currentTime
 
-        isPlaying = false
+        playbackStartTime =
+            nil
+
+        isPlaying =
+            false
 
         stopTimer()
     }
@@ -582,14 +749,18 @@ private func loadBitrate(
 
     private func resume() {
 
-        guard let track = currentTrack
+        guard
+            let track =
+                currentTrack
         else {
             return
         }
 
         if currentTime == 0 {
 
-            startTrack(track)
+            startTrack(
+                track
+            )
 
             return
         }
@@ -597,7 +768,9 @@ private func loadBitrate(
         if !engine.isRunning {
 
             do {
+
                 try engine.start()
+
             } catch {
 
                 print(
@@ -609,11 +782,13 @@ private func loadBitrate(
             }
         }
 
-        playbackStartTime = Date()
+        playbackStartTime =
+            Date()
 
         playerNode.play()
 
-        isPlaying = true
+        isPlaying =
+            true
 
         startTimer()
     }
@@ -622,7 +797,8 @@ private func loadBitrate(
 
     func next() {
 
-        guard !playlist.isEmpty
+        guard
+            !playlist.isEmpty
         else {
             return
         }
@@ -634,11 +810,13 @@ private func loadBitrate(
                 var nextIndex =
                     currentIndex
 
-                while nextIndex == currentIndex {
+                while nextIndex ==
+                        currentIndex {
 
                     nextIndex =
                         Int.random(
-                            in: 0..<playlist.count
+                            in:
+                                0..<playlist.count
                         )
                 }
 
@@ -650,11 +828,13 @@ private func loadBitrate(
 
             currentIndex += 1
 
-            if currentIndex >= playlist.count {
+            if currentIndex >=
+                playlist.count {
 
                 if repeatMode == 2 {
 
-                    currentIndex = 0
+                    currentIndex =
+                        0
 
                 } else {
 
@@ -677,14 +857,17 @@ private func loadBitrate(
 
     func previous() {
 
-        guard !playlist.isEmpty
+        guard
+            !playlist.isEmpty
         else {
             return
         }
 
         if currentTime > 3 {
 
-            seek(to: 0)
+            seek(
+                to: 0
+            )
 
             return
         }
@@ -700,7 +883,8 @@ private func loadBitrate(
 
             } else {
 
-                currentIndex = 0
+                currentIndex =
+                    0
             }
         }
 
@@ -713,28 +897,39 @@ private func loadBitrate(
 
     func stop() {
 
-        playbackGeneration += 1
+        playbackGeneration +=
+            1
 
         playerNode.stop()
 
-        isPlaying = false
+        isPlaying =
+            false
 
-        currentTime = 0
-        pausedTime = 0
+        currentTime =
+            0
 
-        playbackStartTime = nil
+        pausedTime =
+            0
+
+        playbackStartTime =
+            nil
 
         stopTimer()
 
-        if let file = currentFile {
+        if let file =
+            currentFile {
 
             let sampleRate =
-                file.processingFormat.sampleRate
+                file.processingFormat
+                    .sampleRate
 
             if sampleRate > 0 {
 
                 duration =
-                    Double(file.length) / sampleRate
+                    Double(
+                        file.length
+                    )
+                    / sampleRate
             }
         }
     }
@@ -743,24 +938,28 @@ private func loadBitrate(
 
     private func trackFinished() {
 
-        guard !playlist.isEmpty
+        guard
+            !playlist.isEmpty
         else {
 
-            isPlaying = false
+            isPlaying =
+                false
 
             stopTimer()
 
             return
         }
 
-        DispatchQueue.main.async { [weak self] in
+        DispatchQueue.main.async {
+            [weak self] in
 
             guard let self
             else {
                 return
             }
 
-            self.playbackStartTime = nil
+            self.playbackStartTime =
+                nil
 
             self.stopTimer()
 
@@ -771,7 +970,9 @@ private func loadBitrate(
                 if let track =
                     self.currentTrack {
 
-                    self.startTrack(track)
+                    self.startTrack(
+                        track
+                    )
                 }
 
             default:
@@ -783,19 +984,24 @@ private func loadBitrate(
 
     // MARK: - Seek
 
-    func seek(to time: TimeInterval) {
+    func seek(
+        to time: TimeInterval
+    ) {
 
         print(
             "SEEK REQUEST:",
             time
         )
 
-        guard let file = currentFile
+        guard
+            let file =
+                currentFile
         else {
             return
         }
 
-        let wasPlaying = isPlaying
+        let wasPlaying =
+            isPlaying
 
         let clamped =
             max(
@@ -807,7 +1013,8 @@ private func loadBitrate(
             )
 
         let sampleRate =
-            file.processingFormat.sampleRate
+            file.processingFormat
+                .sampleRate
 
         guard sampleRate > 0
         else {
@@ -816,38 +1023,54 @@ private func loadBitrate(
 
         let sampleTime =
             AVAudioFramePosition(
-                clamped * sampleRate
+                clamped
+                * sampleRate
             )
 
         let remainingFrames =
-            file.length - sampleTime
+            file.length
+            - sampleTime
 
         guard remainingFrames > 0
         else {
+
             stop()
+
             return
         }
 
         let frameCount =
             AVAudioFrameCount(
                 min(
-                    Int64(remainingFrames),
-                    Int64(UInt32.max)
+                    Int64(
+                        remainingFrames
+                    ),
+                    Int64(
+                        UInt32.max
+                    )
                 )
             )
 
-        playbackGeneration += 1
-        let generation = playbackGeneration
+        playbackGeneration +=
+            1
+
+        let generation =
+            playbackGeneration
 
         playerNode.stop()
 
-        currentTime = clamped
-        pausedTime = clamped
+        currentTime =
+            clamped
+
+        pausedTime =
+            clamped
 
         playerNode.scheduleSegment(
             file,
-            startingFrame: sampleTime,
-            frameCount: frameCount,
+            startingFrame:
+                sampleTime,
+            frameCount:
+                frameCount,
             at: nil
         ) { [weak self] in
 
@@ -858,7 +1081,9 @@ private func loadBitrate(
                     return
                 }
 
-                guard self.playbackGeneration == generation
+                guard
+                    self.playbackGeneration
+                    == generation
                 else {
                     return
                 }
@@ -869,9 +1094,11 @@ private func loadBitrate(
 
         if wasPlaying {
 
-            playbackStartTime = Date()
+            playbackStartTime =
+                Date()
 
-            isPlaying = true
+            isPlaying =
+                true
 
             playerNode.play()
 
@@ -879,9 +1106,11 @@ private func loadBitrate(
 
         } else {
 
-            playbackStartTime = nil
+            playbackStartTime =
+                nil
 
-            isPlaying = false
+            isPlaying =
+                false
 
             stopTimer()
         }
@@ -889,7 +1118,9 @@ private func loadBitrate(
 
     // MARK: - Volume
 
-    func setVolume(_ value: Float) {
+    func setVolume(
+        _ value: Float
+    ) {
 
         let clamped =
             min(
@@ -900,13 +1131,17 @@ private func loadBitrate(
                 )
             )
 
-        volume = clamped
+        volume =
+            clamped
 
         if isMuted {
-            isMuted = false
+
+            isMuted =
+                false
         }
 
-        playerNode.volume = clamped
+        playerNode.volume =
+            clamped
     }
 
     func toggleMute() {
@@ -915,11 +1150,13 @@ private func loadBitrate(
 
         if isMuted {
 
-            playerNode.volume = 0
+            playerNode.volume =
+                0
 
         } else {
 
-            playerNode.volume = volume
+            playerNode.volume =
+                volume
         }
     }
 
@@ -936,10 +1173,12 @@ private func loadBitrate(
 
         timer.schedule(
             deadline: .now(),
-            repeating: .milliseconds(50)
+            repeating:
+                .milliseconds(50)
         )
 
-        timer.setEventHandler { [weak self] in
+        timer.setEventHandler {
+            [weak self] in
 
             guard let self
             else {
@@ -954,7 +1193,8 @@ private func loadBitrate(
             self.updateCurrentTime()
         }
 
-        playbackTimer = timer
+        playbackTimer =
+            timer
 
         timer.resume()
     }
@@ -973,17 +1213,22 @@ private func loadBitrate(
             return
         }
 
-        guard let start =
-            playbackStartTime
+        guard
+            let start =
+                playbackStartTime
         else {
             return
         }
 
         let elapsed =
-            Date().timeIntervalSince(start)
+            Date()
+                .timeIntervalSince(
+                    start
+                )
 
         let newTime =
-            pausedTime + elapsed
+            pausedTime
+            + elapsed
 
         currentTime =
             min(
@@ -1007,8 +1252,9 @@ private func loadBitrate(
         gain: Float
     ) {
 
-        guard band >= 0,
-              band < 10
+        guard
+            band >= 0,
+            band < 10
         else {
             return
         }
@@ -1032,8 +1278,12 @@ private func loadBitrate(
         _ enabled: Bool
     ) {
 
-        isEQEnabled = enabled
-        eqEnabledDefaultsKeySave(enabled)
+        isEQEnabled =
+            enabled
+
+        eqEnabledDefaultsKeySave(
+            enabled
+        )
 
         for band in eq.bands {
 
@@ -1044,11 +1294,13 @@ private func loadBitrate(
 
     // MARK: - EQ persistence
 
-    var savedEQValues: [Float] {
+    var savedEQValues:
+        [Float] {
 
         if let saved =
             UserDefaults.standard.array(
-                forKey: eqDefaultsKey
+                forKey:
+                    eqDefaultsKey
             ) as? [NSNumber] {
 
             let values =
@@ -1057,13 +1309,16 @@ private func loadBitrate(
                 }
 
             if values.count == 10 {
+
                 return values
             }
         }
 
         return Array(
-            repeating: 0,
-            count: 10
+            repeating:
+                0,
+            count:
+                10
         )
     }
 
@@ -1080,10 +1335,12 @@ private func loadBitrate(
 
         let enabled =
             UserDefaults.standard.bool(
-                forKey: eqEnabledDefaultsKey
+                forKey:
+                    eqEnabledDefaultsKey
             )
 
-        isEQEnabled = enabled
+        isEQEnabled =
+            enabled
 
         for band in eq.bands {
 
@@ -1097,13 +1354,15 @@ private func loadBitrate(
         let values =
             (0..<10).map {
                 NSNumber(
-                    value: eq.bands[$0].gain
+                    value:
+                        eq.bands[$0].gain
                 )
             }
 
         UserDefaults.standard.set(
             values,
-            forKey: eqDefaultsKey
+            forKey:
+                eqDefaultsKey
         )
     }
 
@@ -1113,7 +1372,8 @@ private func loadBitrate(
 
         UserDefaults.standard.set(
             enabled,
-            forKey: eqEnabledDefaultsKey
+            forKey:
+                eqEnabledDefaultsKey
         )
     }
 
@@ -1121,7 +1381,8 @@ private func loadBitrate(
 
     func clear() {
 
-        playbackGeneration += 1
+        playbackGeneration +=
+            1
 
         playerNode.stop()
 
@@ -1129,19 +1390,31 @@ private func loadBitrate(
 
         playlist.removeAll()
 
-        currentIndex = 0
+        currentIndex =
+            0
 
-        currentTrack = nil
-        currentFile = nil
+        currentTrack =
+            nil
 
-        currentTime = 0
-        duration = 0
+        currentFile =
+            nil
 
-        bitrate = 0
+        currentTime =
+            0
 
-        pausedTime = 0
-        playbackStartTime = nil
+        duration =
+            0
 
-        isPlaying = false
+        bitrate =
+            0
+
+        pausedTime =
+            0
+
+        playbackStartTime =
+            nil
+
+        isPlaying =
+            false
     }
 }

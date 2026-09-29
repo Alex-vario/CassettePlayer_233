@@ -3,3 +3,6 @@
 .swiftpm/
 xcuserdata/
 DerivedData/
+
+# Local application bundle
+CassettePlayer.app/

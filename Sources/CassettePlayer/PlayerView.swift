@@ -34,7 +34,7 @@ struct PlayerView: View {
         CGSize(width: 307, height: 176)
 
     private let cassetteButtonSize =
-        CGSize(width: 142, height: 28)
+        CGSize(width: 142, height: 39)
 
     private let timerSize =
         CGSize(width: 142, height: 28)
@@ -58,7 +58,7 @@ struct PlayerView: View {
 
     // MARK: - Body
 
-var body: some View {
+    var body: some View {
 
         ZStack {
 
@@ -323,18 +323,18 @@ var body: some View {
                 audio: audio,
                 showPlaylist: showPlaylist
             )
-                .frame(
-                    width: indicatorSize.width,
-                    height: indicatorSize.height
-                )
-                .position(
-                    x:
-                        x1
-                        + indicatorSize.width / 2,
-                    y:
-                        upperY
-                        + indicatorSize.height / 2
-                )
+            .frame(
+                width: indicatorSize.width,
+                height: indicatorSize.height
+            )
+            .position(
+                x:
+                    x1
+                    + indicatorSize.width / 2,
+                y:
+                    upperY
+                    + indicatorSize.height / 2
+            )
 
             RecessedPanel {
 
@@ -656,7 +656,8 @@ private struct RightControlColumn: View {
         VStack(spacing: 8) {
 
             CassetteButtonPlaceholder(
-                size: cassetteSize
+                size: cassetteSize,
+                audio: audio
             )
 
             TimerPlaceholder(
@@ -848,9 +849,12 @@ private struct EQPlaceholder: View {
         }
         .contentShape(Rectangle())
         .onAppear {
-            let savedValues = audio.savedEQValues
+
+            let savedValues =
+                audio.savedEQValues
 
             if values != savedValues {
+
                 withAnimation(
                     .easeOut(duration: 0.7)
                 ) {
@@ -859,6 +863,7 @@ private struct EQPlaceholder: View {
             }
         }
         .contextMenu {
+
             Button("Reset EQ") {
 
                 let resetValues =
@@ -874,6 +879,7 @@ private struct EQPlaceholder: View {
                 }
 
                 for index in 0..<10 {
+
                     audio.setEQGain(
                         band: index,
                         gain: 0
@@ -884,6 +890,7 @@ private struct EQPlaceholder: View {
     }
 
     private var eqStatusLED: some View {
+
         RoundedRectangle(
             cornerRadius: 0.8
         )
@@ -897,6 +904,7 @@ private struct EQPlaceholder: View {
             height: 4
         )
         .overlay {
+
             RoundedRectangle(
                 cornerRadius: 0.8
             )
@@ -908,9 +916,10 @@ private struct EQPlaceholder: View {
             )
         }
         .shadow(
-            color: audio.isEQEnabled
-                ? Color.red.opacity(0.65)
-                : Color.clear,
+            color:
+                audio.isEQEnabled
+                    ? Color.red.opacity(0.65)
+                    : Color.clear,
             radius: 3
         )
         .animation(
@@ -1203,8 +1212,12 @@ private struct AlbumPlaceholder: View {
                     Rectangle()
                         .fill(Color.black.opacity(0.65))
 
-                    if let artworkData = audio.currentTrack?.artwork,
-                       let nsImage = NSImage(data: artworkData) {
+                    if let artworkData =
+                        audio.currentTrack?.artwork,
+                       let nsImage =
+                        NSImage(
+                            data: artworkData
+                        ) {
 
                         Image(nsImage: nsImage)
                             .resizable()
@@ -1317,7 +1330,7 @@ private struct CassetteBayPlaceholder: View {
 
                 if let cassetteURL =
                     Bundle.module.url(
-                        forResource: "cassette",
+                        forResource: audio.cassetteName,
                         withExtension: "png"
                     ),
                     let cassetteImage =
@@ -1397,43 +1410,85 @@ private struct CassetteButtonPlaceholder: View {
 
     let size: CGSize
 
+    @ObservedObject var audio: AudioPlayer
+
     var body: some View {
 
-        RoundedRectangle(
-            cornerRadius: 1.5
-        )
-        .fill(
-            PanelMaterials.aluminum
-        )
-        .overlay {
+        ZStack {
 
-            RoundedRectangle(
-                cornerRadius: 1.5
-            )
-            .stroke(
-                Color.black.opacity(0.7),
-                lineWidth: 1
-            )
-        }
-        .overlay {
-
-            Text("CASSETTE")
-                .font(
-                    .system(
-                        size: 7,
-                        weight: .medium,
-                        design: .monospaced
+            Rectangle()
+                .fill(
+                    Color(
+                        red: 0.045,
+                        green: 0.047,
+                        blue: 0.050
                     )
                 )
-                .foregroundStyle(
-                    Color.black.opacity(0.75)
+
+            Rectangle()
+                .stroke(
+                    Color.black.opacity(0.95),
+                    lineWidth: 2
                 )
+                .padding(1)
+
+            Rectangle()
+                .stroke(
+                    Color.white.opacity(0.07),
+                    lineWidth: 1
+                )
+                .padding(3)
+
+            HStack(
+                spacing: 8
+            ) {
+
+                if let cassetteURL =
+                    Bundle.module.url(
+                        forResource: audio.cassetteName,
+                        withExtension: "png"
+                    ),
+                    let cassetteImage =
+                        NSImage(contentsOf: cassetteURL) {
+
+                    Image(nsImage: cassetteImage)
+                        .resizable()
+                        .aspectRatio(
+                            contentMode: .fit
+                        )
+                        .frame(
+                            width: 59,
+                            height: 31
+                        )
+                        .clipped()
+                }
+
+                Spacer(
+                    minLength: 0
+                )
+
+                Button(
+                    action: {
+                        audio.changeCassette()
+                    }
+                ) {
+                    Color.clear
+                }
+                .buttonStyle(
+                    TransportButtonStyle(
+                        title: "↻",
+                        isActive: false,
+                        momentary: true,
+                        buttonWidth: 65,
+                        buttonHeight: 39
+                    )
+                )
+            }
+            .padding(
+                .horizontal,
+                5
+            )
         }
-        .shadow(
-            color: .black.opacity(0.45),
-            radius: 2,
-            y: 2
-        )
         .frame(
             width: size.width,
             height: size.height
@@ -1461,6 +1516,7 @@ private struct TimerPlaceholder: View {
     )
 
     private var remainingTime: Int {
+
         max(
             0,
             Int(
@@ -1622,7 +1678,9 @@ private struct TimerPlaceholder: View {
 
 private struct LCDSegmentShape: Shape {
 
-    func path(in rect: CGRect) -> Path {
+    func path(
+        in rect: CGRect
+    ) -> Path {
 
         let cut =
             min(
@@ -1870,19 +1928,33 @@ private struct SevenSegmentDigit: View {
             return ["b", "c"]
 
         case "2":
-            return ["a", "b", "g", "e", "d"]
+            return [
+                "a", "b", "g",
+                "e", "d"
+            ]
 
         case "3":
-            return ["a", "b", "g", "c", "d"]
+            return [
+                "a", "b", "g",
+                "c", "d"
+            ]
 
         case "4":
-            return ["f", "g", "b", "c"]
+            return [
+                "f", "g", "b", "c"
+            ]
 
         case "5":
-            return ["a", "f", "g", "c", "d"]
+            return [
+                "a", "f", "g",
+                "c", "d"
+            ]
 
         case "6":
-            return ["a", "f", "g", "e", "c", "d"]
+            return [
+                "a", "f", "g",
+                "e", "c", "d"
+            ]
 
         case "7":
             return ["a", "b", "c"]
@@ -2227,9 +2299,11 @@ private struct LowerButtonsPlaceholder: View {
             lowerButton(
                 active: audio.isEQEnabled
             ) {
+
                 audio.setEQEnabled(
                     !audio.isEQEnabled
                 )
+
             } content: {
 
                 Text("EQ")
@@ -2247,7 +2321,9 @@ private struct LowerButtonsPlaceholder: View {
             lowerButton(
                 active: audio.shuffle
             ) {
+
                 audio.shuffle.toggle()
+
             } content: {
 
                 Text("SH")
@@ -2263,7 +2339,8 @@ private struct LowerButtonsPlaceholder: View {
             // RP — Repeat
 
             lowerButton(
-                active: audio.repeatMode != 0
+                active:
+                    audio.repeatMode != 0
             ) {
 
                 audio.repeatMode += 1
@@ -2462,7 +2539,6 @@ private struct LowerButtonStyle: ButtonStyle {
             )
     }
 }
-
 
 // MARK: - Volume
 

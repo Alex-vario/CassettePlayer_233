@@ -7,108 +7,173 @@ final class MediaKeyManager {
     private var manager: IOHIDManager?
     private weak var audioPlayer: AudioPlayer?
 
+    private var hidThread: Thread?
+    private var hidRunLoop: CFRunLoop?
+
+    private let runLoopReady = DispatchSemaphore(value: 0)
+
     init(audioPlayer: AudioPlayer) {
         self.audioPlayer = audioPlayer
     }
 
     func start() {
 
-        guard manager == nil else {
+        guard hidThread == nil else {
             return
         }
 
-        let hidManager =
-            IOHIDManagerCreate(
-                kCFAllocatorDefault,
-                IOOptionBits(kIOHIDOptionsTypeNone)
-            )
+        let thread =
+            Thread { [weak self] in
+                self?.runHIDLoop()
+            }
 
-        manager = hidManager
+        thread.name =
+            "CassettePlayer.MediaKeys"
 
-        IOHIDManagerSetDeviceMatching(
-            hidManager,
-            nil
-        )
+        hidThread = thread
 
-        let context =
-            Unmanaged.passUnretained(
-                self
-            ).toOpaque()
+        thread.start()
 
-        IOHIDManagerRegisterInputValueCallback(
-            hidManager,
-            { context, _, _, value in
-
-                guard let context else {
-                    return
-                }
-
-                let manager =
-                    Unmanaged<MediaKeyManager>
-                        .fromOpaque(context)
-                        .takeUnretainedValue()
-
-                manager.handle(
-                    value: value
-                )
-            },
-            context
-        )
-
-        IOHIDManagerScheduleWithRunLoop(
-            hidManager,
-            CFRunLoopGetMain(),
-            CFRunLoopMode.commonModes.rawValue
-        )
-
-        let status =
-            IOHIDManagerOpen(
-                hidManager,
-                IOOptionBits(kIOHIDOptionsTypeNone)
-            )
+        runLoopReady.wait()
 
         print(
-            "MediaKeyManager: IOHIDManagerOpen = \(status)"
-        )
-
-        guard status == kIOReturnSuccess else {
-
-            print(
-                "MediaKeyManager: IOHIDManager не открылся"
-            )
-
-            manager = nil
-
-            return
-        }
-
-        print(
-            "MediaKeyManager: глобальные медиа-клавиши запущены"
+            "MediaKeyManager: HID-поток запущен"
         )
     }
 
     func stop() {
 
-        guard let manager else {
+        guard let hidRunLoop else {
             return
         }
 
-        IOHIDManagerUnscheduleFromRunLoop(
-            manager,
-            CFRunLoopGetMain(),
-            CFRunLoopMode.commonModes.rawValue
+        CFRunLoopStop(
+            hidRunLoop
         )
 
-        IOHIDManagerClose(
-            manager,
-            IOOptionBits(kIOHIDOptionsTypeNone)
-        )
-
-        self.manager = nil
+        hidThread = nil
+        self.hidRunLoop = nil
 
         print(
             "MediaKeyManager: остановлен"
         )
+    }
+
+    private func runHIDLoop() {
+
+        autoreleasepool {
+
+    guard let runLoop =
+            CFRunLoopGetCurrent()
+    else {
+        print(
+            "MediaKeyManager: не удалось получить HID RunLoop"
+        )
+
+        runLoopReady.signal()
+
+        return
+    }
+
+    hidRunLoop =
+        runLoop
+
+            let hidManager =
+                IOHIDManagerCreate(
+                    kCFAllocatorDefault,
+                    IOOptionBits(kIOHIDOptionsTypeNone)
+                )
+
+            manager =
+                hidManager
+
+            // Получаем все HID-устройства.
+            //
+            // Это оставляем намеренно:
+            // фильтрация на уровне Device Matching
+            // не находила Consumer Control JLab.
+            IOHIDManagerSetDeviceMatching(
+                hidManager,
+                nil
+            )
+
+            let context =
+                Unmanaged.passUnretained(
+                    self
+                ).toOpaque()
+
+            IOHIDManagerRegisterInputValueCallback(
+                hidManager,
+                { context, _, _, value in
+
+                    guard let context else {
+                        return
+                    }
+
+                    let mediaKeyManager =
+                        Unmanaged<MediaKeyManager>
+                            .fromOpaque(context)
+                            .takeUnretainedValue()
+
+                    mediaKeyManager.handle(
+                        value: value
+                    )
+                },
+                context
+            )
+
+            IOHIDManagerScheduleWithRunLoop(
+                hidManager,
+                runLoop,
+                CFRunLoopMode.defaultMode.rawValue
+            )
+
+            let status =
+                IOHIDManagerOpen(
+                    hidManager,
+                    IOOptionBits(kIOHIDOptionsTypeNone)
+                )
+
+            print(
+                "MediaKeyManager: IOHIDManagerOpen = \(status)"
+            )
+
+            runLoopReady.signal()
+
+            guard status == kIOReturnSuccess else {
+
+                print(
+                    "MediaKeyManager: IOHIDManager не открылся"
+                )
+
+                manager = nil
+
+                CFRunLoopStop(
+                    runLoop
+                )
+
+                return
+            }
+
+            print(
+                "MediaKeyManager: глобальные медиа-клавиши запущены"
+            )
+
+            CFRunLoopRun()
+
+            IOHIDManagerUnscheduleFromRunLoop(
+                hidManager,
+                runLoop,
+                CFRunLoopMode.defaultMode.rawValue
+            )
+
+            IOHIDManagerClose(
+                hidManager,
+                IOOptionBits(kIOHIDOptionsTypeNone)
+            )
+
+            manager = nil
+        }
     }
 
     private func handle(
@@ -147,17 +212,27 @@ final class MediaKeyManager {
             ) as? String
             ?? ""
 
-        guard product == "JLab Epic Keys" else {
+        // Нас интересует только JLab Epic Keys.
+        guard product ==
+                "JLab Epic Keys"
+        else {
             return
         }
 
         // Consumer Control.
-        guard usagePage == 0x0C else {
+        guard usagePage ==
+                0x0C
+        else {
             return
         }
 
         // Нас интересуют только события нажатия.
-        guard integerValue == 1 else {
+        //
+        // Отпускание клавиши имеет value = 0.
+        // Служебные события JLab имеют другие значения.
+        guard integerValue ==
+                1
+        else {
             return
         }
 
@@ -165,57 +240,59 @@ final class MediaKeyManager {
             return
         }
 
-        switch usage {
+        // ВАЖНО:
+        //
+        // HID callback теперь работает на отдельном потоке.
+        // AudioPlayer / SwiftUI изменяем через main queue,
+        // чтобы не трогать состояние приложения непосредственно
+        // из HID-потока.
+        DispatchQueue.main.async {
 
-        // Play / Pause
-        case 0xCD:
+            switch usage {
 
-            audioPlayer.togglePlayPause()
+            case 0xCD:
+                // Play / Pause
+                audioPlayer.togglePlayPause()
 
-        // Previous Track
-        case 0xB6:
+            case 0xB6:
+                // Previous Track
+                audioPlayer.previous()
 
-            audioPlayer.previous()
+            case 0xB5:
+                // Next Track
+                audioPlayer.next()
 
-        // Next Track
-        case 0xB5:
+            case 0xE9:
+                // Volume Up
+                let newVolume =
+                    min(
+                        audioPlayer.volume + 0.05,
+                        1.0
+                    )
 
-            audioPlayer.next()
-
-        // Volume Up
-        case 0xE9:
-
-            let newVolume =
-                min(
-                    audioPlayer.volume + 0.05,
-                    1.0
+                audioPlayer.setVolume(
+                    newVolume
                 )
 
-            audioPlayer.setVolume(
-                newVolume
-            )
+            case 0xEA:
+                // Volume Down
+                let newVolume =
+                    max(
+                        audioPlayer.volume - 0.05,
+                        0.0
+                    )
 
-        // Volume Down
-        case 0xEA:
-
-            let newVolume =
-                max(
-                    audioPlayer.volume - 0.05,
-                    0.0
+                audioPlayer.setVolume(
+                    newVolume
                 )
 
-            audioPlayer.setVolume(
-                newVolume
-            )
+            case 0xE2:
+                // Mute
+                audioPlayer.toggleMute()
 
-        // Mute
-        case 0xE2:
-
-            audioPlayer.toggleMute()
-
-        default:
-
-            break
+            default:
+                break
+            }
         }
     }
 }
