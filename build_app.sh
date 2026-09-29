@@ -34,6 +34,10 @@ if [ -d "$BUILD_DIR/CassettePlayer_CassettePlayer.bundle" ]; then
         "$RESOURCES_DIR/"
 fi
 
+cp \
+    "$PROJECT_DIR/AppIcon.icns" \
+    "$RESOURCES_DIR/AppIcon.icns"
+
 cat > "$CONTENTS_DIR/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -49,6 +53,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
 
     <key>CFBundleIdentifier</key>
     <string>$BUNDLE_ID</string>
+
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
 
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>

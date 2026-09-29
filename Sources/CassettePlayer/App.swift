@@ -1,7 +1,11 @@
 import SwiftUI
+import AppKit
 
 @main
 struct CassettePlayerApp: App {
+
+    @NSApplicationDelegateAdaptor(CassettePlayerAppDelegate.self)
+    private var appDelegate
 
     @StateObject private var audio: AudioPlayer
 
@@ -35,5 +39,14 @@ struct CassettePlayerApp: App {
         .windowStyle(
             .hiddenTitleBar
         )
+    }
+}
+
+private final class CassettePlayerAppDelegate: NSObject, NSApplicationDelegate {
+
+    func applicationShouldTerminateAfterLastWindowClosed(
+        _ sender: NSApplication
+    ) -> Bool {
+        true
     }
 }
