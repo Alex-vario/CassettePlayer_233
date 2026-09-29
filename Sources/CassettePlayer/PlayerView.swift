@@ -253,18 +253,15 @@ struct PlayerView: View {
                 ) == .orderedAscending
             }
 
-            let tracks = urls.map { fileURL in
-                AudioTrack(
-                    url: fileURL
-                )
-            }
+            Task {
+                let tracks = await AudioTrack.loadAll(from: urls)
 
-            DispatchQueue.main.async {
+                DispatchQueue.main.async {
+                    audio.setPlaylist(tracks)
 
-                audio.setPlaylist(tracks)
-
-                if let firstTrack = tracks.first {
-                    audio.play(firstTrack)
+                    if let firstTrack = tracks.first {
+                        audio.play(firstTrack)
+                    }
                 }
             }
         }

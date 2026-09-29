@@ -16,34 +16,52 @@ struct AudioTrack: Identifiable, Hashable {
     var artwork: Data?
 
     init(url: URL) {
-
         self.url = url
         self.artist = ""
         self.album = ""
         self.bitrate = 0
         self.artwork = nil
+    }
 
-        let asset = AVURLAsset(
-            url: url
-        )
+    static func load(from url: URL) async -> AudioTrack {
+        var track = AudioTrack(url: url)
+        let asset = AVURLAsset(url: url)
 
-        for item in asset.commonMetadata {
+        do {
+            for item in try await asset.load(.commonMetadata) {
+                switch item.commonKey {
+                case .commonKeyArtist:
+                    track.artist =
+                        (try? await item.load(.stringValue)) ?? ""
 
-            if item.commonKey == .commonKeyArtist {
-                self.artist =
-                    item.stringValue ?? ""
+                case .commonKeyAlbumName:
+                    track.album =
+                        (try? await item.load(.stringValue)) ?? ""
+
+                case .commonKeyArtwork:
+                    track.artwork =
+                        try? await item.load(.dataValue)
+
+                default:
+                    continue
+                }
             }
-
-            else if item.commonKey == .commonKeyAlbumName {
-                self.album =
-                    item.stringValue ?? ""
-            }
-
-            else if item.commonKey == .commonKeyArtwork {
-                self.artwork =
-                    item.dataValue
-            }
+        } catch {
+            // Metadata is optional; the track remains playable without it.
         }
+
+        return track
+    }
+
+    static func loadAll(from urls: [URL]) async -> [AudioTrack] {
+        var tracks: [AudioTrack] = []
+        tracks.reserveCapacity(urls.count)
+
+        for url in urls {
+            tracks.append(await load(from: url))
+        }
+
+        return tracks
     }
 
     static func == (

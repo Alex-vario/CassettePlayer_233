@@ -654,49 +654,37 @@ struct LibraryView: View {
     private func playFolder(
         _ folder: URL
     ) {
+        Task {
+            let tracks = await collectAudioTracks(in: folder)
 
-        let tracks =
-            collectAudioTracks(
-                in: folder
-            )
+            guard !tracks.isEmpty else {
+                return
+            }
 
-        guard !tracks.isEmpty else {
-            return
+            audio.setPlaylist(tracks)
+            audio.play(tracks[0])
+            onClose()
         }
-
-        audio.setPlaylist(
-            tracks
-        )
-
-        audio.play(
-            tracks[0]
-        )
-
-        onClose()
     }
 
     private func playFile(
         _ url: URL
     ) {
+        Task {
+            var tracks = await AudioTrack.loadAll(from: rootFiles)
+            let selectedTrack: AudioTrack
 
-        let track =
-            AudioTrack(
-                url: url
-            )
-
-        audio.setPlaylist(
-            rootFiles.map {
-                AudioTrack(
-                    url: $0
-                )
+            if let existingTrack = tracks.first(where: { $0.url == url }) {
+                selectedTrack = existingTrack
+            } else {
+                selectedTrack = await AudioTrack.load(from: url)
+                tracks.append(selectedTrack)
             }
-        )
 
-        audio.play(
-            track
-        )
-
-        onClose()
+            audio.setPlaylist(tracks)
+            audio.play(selectedTrack)
+            onClose()
+        }
     }
 
     // MARK: - Artist Loading
@@ -716,9 +704,7 @@ struct LibraryView: View {
                 await Task.detached(
                     priority: .userInitiated
                 ) {
-                    Self.collectAudioTracksStatic(
-                        in: root
-                    )
+                    await Self.collectAudioTracksStatic(in: root)
                 }
                 .value
 
@@ -806,22 +792,21 @@ struct LibraryView: View {
 
     private func collectAudioTracks(
         in folder: URL
-    ) -> [AudioTrack] {
+    ) async -> [AudioTrack] {
 
-        Self.collectAudioTracksStatic(
+        await Self.collectAudioTracksStatic(
             in: folder
         )
     }
 
     private nonisolated static func collectAudioTracksStatic(
         in folder: URL
-    ) -> [AudioTrack] {
+    ) async -> [AudioTrack] {
 
         let fm =
             FileManager.default
 
-        var result:
-            [AudioTrack] = []
+        var urls: [URL] = []
 
         let audioExtensions: Set<String> = [
             "mp3",
@@ -886,11 +871,7 @@ struct LibraryView: View {
                     )
                 {
 
-                    result.append(
-                        AudioTrack(
-                            url: item
-                        )
-                    )
+                    urls.append(item)
                 }
             }
         }
@@ -899,7 +880,7 @@ struct LibraryView: View {
             folder
         )
 
-        return result
+        return await AudioTrack.loadAll(from: urls)
     }
 
     // MARK: - Root Chooser
@@ -1563,11 +1544,7 @@ private struct FolderTile: View {
         )
         .clipped()
         .task {
-
-            artwork =
-                findArtwork(
-                    in: folderURL
-                )
+            artwork = await findArtwork(in: folderURL)
         }
     }
 
@@ -1728,6 +1705,8 @@ private struct TrackRow: View {
     let isCurrent: Bool
     let onPlay: () -> Void
 
+    @State private var artist = ""
+
     var body: some View {
 
         Button(
@@ -1784,11 +1763,7 @@ private struct TrackRow: View {
                     )
                     .lineLimit(1)
 
-                    Text(
-                        AudioTrack(
-                            url: url
-                        ).artist
-                    )
+                    Text(artist)
                     .font(
                         .system(
                             size: 10,
@@ -1845,6 +1820,9 @@ private struct TrackRow: View {
         .buttonStyle(
             TrackRowButtonStyle()
         )
+        .task {
+            artist = (await AudioTrack.load(from: url)).artist
+        }
     }
 
     private func durationText(
@@ -1886,7 +1864,7 @@ private struct TrackRow: View {
 
 private func findArtwork(
     in folder: URL
-) -> NSImage? {
+) async -> NSImage? {
 
     let fm =
         FileManager.default
@@ -1921,10 +1899,7 @@ private func findArtwork(
             continue
         }
 
-        let track =
-            AudioTrack(
-                url: url
-            )
+        let track = await AudioTrack.load(from: url)
 
         if let data = track.artwork,
            let image =
