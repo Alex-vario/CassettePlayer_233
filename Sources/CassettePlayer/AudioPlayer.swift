@@ -281,13 +281,13 @@ func removeFromPlaylist(_ track: AudioTrack) {
                 self.leftLevel =
                     min(
                         1,
-                        leftRMS * 1.2
+                        leftRMS * 1.5
                     )
 
                 self.rightLevel =
                     min(
                         1,
-                        rightRMS * 1.2
+                        rightRMS * 1.5
                     )
             }
         }
