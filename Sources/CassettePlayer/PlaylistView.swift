@@ -381,7 +381,7 @@ private struct PlaylistTrackRow: View {
                     : Color.white.opacity(0.42)
             )
             .frame(
-                width: 15,
+                width: 22,
                 alignment: .leading
             )
 

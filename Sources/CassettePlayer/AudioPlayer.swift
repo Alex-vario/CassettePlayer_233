@@ -2,6 +2,26 @@ import Foundation
 import AVFoundation
 import Combine
 
+final class AudioLevelMeter: ObservableObject {
+
+    @Published private(set) var leftLevel: Float = 0
+    @Published private(set) var rightLevel: Float = 0
+
+    func setLevels(left: Float, right: Float) {
+        leftLevel = left
+        rightLevel = right
+    }
+}
+
+final class PlaybackClock: ObservableObject {
+
+    @Published private(set) var currentTime: TimeInterval = 0
+
+    func update(_ time: TimeInterval) {
+        currentTime = time
+    }
+}
+
 final class AudioPlayer: NSObject, ObservableObject {
 
     // MARK: - Published state
@@ -9,12 +29,16 @@ final class AudioPlayer: NSObject, ObservableObject {
     @Published private(set) var currentTrack: AudioTrack?
     @Published private(set) var isPlaying = false
     @Published private(set) var isMuted = false
-    @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
     @Published var volume: Float = 1.0
-    @Published private(set) var leftLevel: Float = 0
-    @Published private(set) var rightLevel: Float = 0
     @Published private(set) var bitrate: Int = 0
+
+    let levelMeter = AudioLevelMeter()
+    let playbackClock = PlaybackClock()
+
+    var currentTime: TimeInterval {
+        playbackClock.currentTime
+    }
 
     @Published var shuffle = false
     @Published var repeatMode = 0
@@ -124,7 +148,7 @@ final class AudioPlayer: NSObject, ObservableObject {
             currentTrack = nil
             currentFile = nil
 
-            currentTime = 0
+            playbackClock.update(0)
             duration = 0
             bitrate = 0
 
@@ -153,7 +177,7 @@ final class AudioPlayer: NSObject, ObservableObject {
             currentTrack = nil
             currentFile = nil
 
-            currentTime = 0
+            playbackClock.update(0)
             duration = 0
             bitrate = 0
 
@@ -181,6 +205,8 @@ final class AudioPlayer: NSObject, ObservableObject {
 
     private var currentFile:
         AVAudioFile?
+
+    private var levelMeterInstalled = false
 
     // MARK: - Playback timer
 
@@ -249,6 +275,8 @@ final class AudioPlayer: NSObject, ObservableObject {
             eq
         )
 
+        eq.bypass = true
+
         for (
             index,
             frequency
@@ -288,19 +316,6 @@ final class AudioPlayer: NSObject, ObservableObject {
         engine.mainMixerNode.outputVolume =
             volume
 
-        installLevelMeter()
-
-        do {
-
-            try engine.start()
-
-        } catch {
-
-            print(
-                "Audio engine start error:",
-                error
-            )
-        }
     }
 
     // MARK: - Level meter
@@ -316,7 +331,7 @@ final class AudioPlayer: NSObject, ObservableObject {
 
         mixer.installTap(
             onBus: 0,
-            bufferSize: 1024,
+            bufferSize: 2048,
             format:
                 mixer.outputFormat(
                     forBus: 0
@@ -388,19 +403,23 @@ final class AudioPlayer: NSObject, ObservableObject {
 
             DispatchQueue.main.async {
 
-                self.leftLevel =
-                    min(
-                        1,
-                        leftRMS * 1.5
-                    )
-
-                self.rightLevel =
-                    min(
-                        1,
-                        rightRMS * 1.5
-                    )
+                self.levelMeter.setLevels(
+                    left: Self.meterLevel(for: leftRMS),
+                    right: Self.meterLevel(for: rightRMS)
+                )
             }
         }
+    }
+
+    private static func meterLevel(for rms: Float) -> Float {
+
+        let decibels =
+            20 * log10(max(rms, 0.0001))
+
+        return min(
+            1,
+            max(0, (decibels + 48) / 48)
+        )
     }
 
     // MARK: - Playlist
@@ -424,7 +443,7 @@ final class AudioPlayer: NSObject, ObservableObject {
             currentFile = nil
 
             duration = 0
-            currentTime = 0
+            playbackClock.update(0)
 
             pausedTime = 0
             playbackStartTime = nil
@@ -522,8 +541,7 @@ final class AudioPlayer: NSObject, ObservableObject {
                     0
             }
 
-            currentTime =
-                0
+            playbackClock.update(0)
 
             pausedTime =
                 0
@@ -566,6 +584,11 @@ final class AudioPlayer: NSObject, ObservableObject {
 
                     self.trackFinished()
                 }
+            }
+
+            if !levelMeterInstalled {
+                installLevelMeter()
+                levelMeterInstalled = true
             }
 
             if !engine.isRunning {
@@ -743,6 +766,8 @@ final class AudioPlayer: NSObject, ObservableObject {
             false
 
         stopTimer()
+
+        engine.pause()
     }
 
     // MARK: - Resume
@@ -905,8 +930,7 @@ final class AudioPlayer: NSObject, ObservableObject {
         isPlaying =
             false
 
-        currentTime =
-            0
+        playbackClock.update(0)
 
         pausedTime =
             0
@@ -915,6 +939,8 @@ final class AudioPlayer: NSObject, ObservableObject {
             nil
 
         stopTimer()
+
+        engine.pause()
 
         if let file =
             currentFile {
@@ -1059,8 +1085,7 @@ final class AudioPlayer: NSObject, ObservableObject {
 
         playerNode.stop()
 
-        currentTime =
-            clamped
+        playbackClock.update(clamped)
 
         pausedTime =
             clamped
@@ -1174,7 +1199,7 @@ final class AudioPlayer: NSObject, ObservableObject {
         timer.schedule(
             deadline: .now(),
             repeating:
-                .milliseconds(50)
+                .milliseconds(200)
         )
 
         timer.setEventHandler {
@@ -1230,7 +1255,7 @@ final class AudioPlayer: NSObject, ObservableObject {
             pausedTime
             + elapsed
 
-        currentTime =
+        playbackClock.update(
             min(
                 duration,
                 max(
@@ -1238,11 +1263,8 @@ final class AudioPlayer: NSObject, ObservableObject {
                     newTime
                 )
             )
-
-        print(
-            "TIME:",
-            currentTime
         )
+
     }
 
     // MARK: - EQ
@@ -1290,6 +1312,9 @@ final class AudioPlayer: NSObject, ObservableObject {
             band.bypass =
                 !enabled
         }
+
+        eq.bypass =
+            !enabled
     }
 
     // MARK: - EQ persistence
@@ -1347,6 +1372,9 @@ final class AudioPlayer: NSObject, ObservableObject {
             band.bypass =
                 !enabled
         }
+
+        eq.bypass =
+            !enabled
     }
 
     private func saveEQSettings() {
@@ -1399,8 +1427,7 @@ final class AudioPlayer: NSObject, ObservableObject {
         currentFile =
             nil
 
-        currentTime =
-            0
+        playbackClock.update(0)
 
         duration =
             0

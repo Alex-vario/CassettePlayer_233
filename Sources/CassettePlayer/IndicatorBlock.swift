@@ -54,22 +54,13 @@ struct IndicatorBlock: View {
 
             VStack(spacing: 5) {
 
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
 
                     ZStack(alignment: .leading) {
 
-                        VStack(spacing: 14) {
-
-                            LevelMeter(
-                                channel: "Л",
-                                level: audio.leftLevel
-                            )
-
-                            LevelMeter(
-                                channel: "П",
-                                level: audio.rightLevel
-                            )
-                        }
+                        StereoLevelMeters(
+                            meter: audio.levelMeter
+                        )
 
                         Text("-20")
                             .font(
@@ -156,7 +147,7 @@ struct IndicatorBlock: View {
                             )
                     }
                     .frame(
-                        width: 238,
+                        width: 199,
                         height: 52
                     )
 
@@ -165,7 +156,7 @@ struct IndicatorBlock: View {
                         showPlaylist: showPlaylist
                     )
                     .frame(
-                        width: 48,
+                        width: 92,
                         height: 46
                     )
                 }
@@ -183,7 +174,7 @@ struct IndicatorBlock: View {
                     alignment: .leading
                 )
             }
-            .padding(.horizontal, 9)
+            .padding(.horizontal, 6)
             .padding(.vertical, 7)
 
             // =================================================
@@ -354,6 +345,25 @@ private struct ScrollingTrackName: View {
     }
 }
 
+private struct StereoLevelMeters: View {
+
+    @ObservedObject var meter: AudioLevelMeter
+
+    var body: some View {
+        VStack(spacing: 14) {
+            LevelMeter(
+                channel: "Л",
+                level: meter.leftLevel
+            )
+
+            LevelMeter(
+                channel: "П",
+                level: meter.rightLevel
+            )
+        }
+    }
+}
+
 // =====================================================
 // HORIZONTAL LEVEL METER
 // =====================================================
@@ -426,7 +436,7 @@ private struct LevelMeter: View {
                 )
         }
         .frame(
-            width: 252,
+            width: 199,
             height: 19,
             alignment: .leading
         )
@@ -442,10 +452,7 @@ private struct LevelSegment: View {
     let index: Int
     let level: Float
 
-    @State private var displayedLevel: Float = 0
-
     private let segmentCount = 14
-    private let releaseTime: TimeInterval = 0.35
 
     private var isRed: Bool {
         index >= 10
@@ -472,7 +479,7 @@ private struct LevelSegment: View {
 
         let normalized =
             min(
-                max(displayedLevel, 0),
+                max(level, 0),
                 1
             )
 
@@ -504,40 +511,6 @@ private struct LevelSegment: View {
             ? 1
             : 0.12
         )
-        .onAppear {
-            displayedLevel = level
-        }
-        .onReceive(
-            Timer.publish(
-                every: 0.02,
-                on: .main,
-                in: .common
-            ).autoconnect()
-        ) { _ in
-
-            if level >= displayedLevel {
-
-                displayedLevel = level
-
-            } else {
-
-                let difference =
-                    displayedLevel - level
-
-                let step =
-                    difference *
-                    Float(
-                        0.02 /
-                        releaseTime
-                    )
-
-                displayedLevel =
-                    max(
-                        level,
-                        displayedLevel - step
-                    )
-            }
-        }
     }
 }
 
@@ -560,18 +533,36 @@ private struct IndicatorIcons: View {
 
         VStack(spacing: 14) {
 
-            HStack(spacing: 12) {
-                IndicatorMark("⇄", color: green)
-                IndicatorMark("↻", color: green)
+            HStack(spacing: 4) {
+                IndicatorMark(
+                    "EQ",
+                    color: green,
+                    isActive: audio.isEQEnabled
+                )
+                IndicatorMark(
+                    "SH",
+                    color: green,
+                    isActive: audio.shuffle
+                )
+                IndicatorMark(
+                    "RP1",
+                    color: green,
+                    isActive: audio.repeatMode == 1
+                )
+                IndicatorMark(
+                    "RPA",
+                    color: green,
+                    isActive: audio.repeatMode == 2
+                )
+            }
+
+            HStack(spacing: 4) {
+                IndicatorMark("ST", color: green)
                 IndicatorMark(
                     "M",
                     color: green,
                     isActive: audio.isMuted
                 )
-            }
-
-            HStack(spacing: 12) {
-                IndicatorMark("ST", color: green)
                 IndicatorMark(
                     "PL",
                     color: green,
@@ -585,11 +576,7 @@ private struct IndicatorIcons: View {
                 )
             }
         }
-        .frame(
-            width: 48,
-            height: 46
-        )
-        .offset(x: -15)
+        .frame(width: 92, height: 46)
     }
 }
 
@@ -668,16 +655,19 @@ private struct IndicatorMark: View {
                     .blur(radius: 4.5)
                     .opacity(0.55)
 
-                Text(text)
-                    .font(
-                        .system(
-                            size: 10,
-                            weight: .bold,
-                            design: .monospaced
-                        )
-                    )
-                    .foregroundStyle(color.opacity(0.72))
             }
+
+            Text(text)
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .bold,
+                        design: .monospaced
+                    )
+                )
+                .foregroundStyle(
+                    color.opacity(isActive ? 0.72 : 0.16)
+                )
 
             Rectangle()
                 .fill(

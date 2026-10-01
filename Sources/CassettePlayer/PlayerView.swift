@@ -2,12 +2,14 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 import AVFoundation
+import QuartzCore
 
 struct PlayerView: View {
 
     @EnvironmentObject private var audio: AudioPlayer
 
     @State private var showPlaylist = false
+    @State private var isPlaylistMounted = false
     @State private var showLibrary = false
 
     // MARK: - Geometry
@@ -22,7 +24,7 @@ struct PlayerView: View {
     // MARK: - Block sizes
 
     private let indicatorSize =
-        CGSize(width: 321, height: 85)
+        CGSize(width: 303, height: 85)
 
     private let eqSize =
         CGSize(width: 321, height: 91)
@@ -34,13 +36,15 @@ struct PlayerView: View {
         CGSize(width: 307, height: 176)
 
     private let cassetteButtonSize =
-        CGSize(width: 142, height: 39)
+        CGSize(width: 136, height: 39)
 
     private let timerSize =
-        CGSize(width: 142, height: 28)
+        CGSize(width: 136, height: 28)
 
     private let transportSize =
-        CGSize(width: 142, height: 171)
+        CGSize(width: 136, height: 171)
+
+    private let playlistPanelWidth: CGFloat = 180
 
     private let lowerButtonsSize =
         CGSize(width: 321, height: 43)
@@ -74,7 +78,7 @@ struct PlayerView: View {
 
                         withAnimation(
                             .easeInOut(
-                                duration: 0.32
+                                duration: 0.42
                             )
                         ) {
                             showLibrary = false
@@ -98,12 +102,6 @@ struct PlayerView: View {
             height: deckHeight
         )
         .clipped()
-        .animation(
-            .easeInOut(
-                duration: 0.32
-            ),
-            value: showLibrary
-        )
         .onDrop(
             of: [
                 UTType.fileURL.identifier
@@ -116,6 +114,37 @@ struct PlayerView: View {
             )
 
             return true
+        }
+    }
+
+    private func togglePlaylist() {
+        if showPlaylist {
+            hidePlaylist()
+            return
+        }
+
+        guard isPlaylistMounted else {
+            isPlaylistMounted = true
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.48)) {
+                    showPlaylist = true
+                }
+            }
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.48)) {
+            showPlaylist = true
+        }
+    }
+
+    private func hidePlaylist() {
+        guard showPlaylist else {
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.48)) {
+            showPlaylist = false
         }
     }
 
@@ -327,7 +356,7 @@ struct PlayerView: View {
             .position(
                 x:
                     x1
-                    + indicatorSize.width / 2,
+                    + eqSize.width / 2,
                 y:
                     upperY
                     + indicatorSize.height / 2
@@ -357,7 +386,9 @@ struct PlayerView: View {
             LowerButtonsPlaceholder(
                 audio: audio,
                 showPlaylist: $showPlaylist,
-                showLibrary: $showLibrary
+                showLibrary: $showLibrary,
+                onTogglePlaylist: togglePlaylist,
+                onClosePlaylist: hidePlaylist
             )
             .frame(
                 width: lowerButtonsSize.width,
@@ -431,7 +462,8 @@ struct PlayerView: View {
 
             ProgressPlaceholder(
                 size: progressSize,
-                audio: audio
+                audio: audio,
+                playbackClock: audio.playbackClock
             )
             .frame(
                 width: progressSize.width,
@@ -475,22 +507,17 @@ struct PlayerView: View {
             // PLAYLIST SHUTTER
             // =====================================================
 
-            if showPlaylist {
+            if isPlaylistMounted {
 
                 PlaylistView(
                     audio: audio,
-                    onClose: {
-                        withAnimation(
-                            .easeInOut(duration: 0.32)
-                        ) {
-                            showPlaylist = false
-                        }
-                    }
+                    onClose: hidePlaylist
                 )
                 .frame(
-                    width: transportSize.width,
+                    width: playlistPanelWidth,
                     height: deckHeight
                 )
+                .compositingGroup()
                 .position(
                     x:
                         x4
@@ -498,16 +525,14 @@ struct PlayerView: View {
                     y:
                         deckHeight / 2
                 )
-                .transition(
-                    .move(edge: .trailing)
+                .offset(
+                    x: showPlaylist ? 0 : playlistPanelWidth
                 )
+                .opacity(showPlaylist ? 1 : 0)
+                .allowsHitTesting(showPlaylist)
                 .zIndex(100)
             }
         }
-        .animation(
-            .easeInOut(duration: 0.32),
-            value: showPlaylist
-        )
     }
 
     // MARK: - Deck background
@@ -659,12 +684,14 @@ private struct RightControlColumn: View {
 
             TimerPlaceholder(
                 size: timerSize,
-                audio: audio
+                audio: audio,
+                playbackClock: audio.playbackClock
             )
 
             TransportPlaceholder(
                 size: transportSize,
-                audio: audio
+                audio: audio,
+                playbackClock: audio.playbackClock
             )
         }
         .frame(
@@ -833,16 +860,6 @@ private struct EQPlaceholder: View {
                 .vertical,
                 4
             )
-
-            eqStatusLED
-                .padding(
-                    .leading,
-                    5
-                )
-                .padding(
-                    .top,
-                    0
-                )
         }
         .contentShape(Rectangle())
         .onAppear {
@@ -886,44 +903,6 @@ private struct EQPlaceholder: View {
         }
     }
 
-    private var eqStatusLED: some View {
-
-        RoundedRectangle(
-            cornerRadius: 0.8
-        )
-        .fill(
-            audio.isEQEnabled
-                ? Color.red
-                : Color.black.opacity(0.72)
-        )
-        .frame(
-            width: 8,
-            height: 4
-        )
-        .overlay {
-
-            RoundedRectangle(
-                cornerRadius: 0.8
-            )
-            .stroke(
-                audio.isEQEnabled
-                    ? Color.red.opacity(0.75)
-                    : Color.white.opacity(0.10),
-                lineWidth: 0.5
-            )
-        }
-        .shadow(
-            color:
-                audio.isEQEnabled
-                    ? Color.red.opacity(0.65)
-                    : Color.clear,
-            radius: 3
-        )
-        .animation(
-            .easeOut(duration: 0.18),
-            value: audio.isEQEnabled
-        )
-    }
 }
 
 // MARK: - EQ scale
@@ -1161,6 +1140,7 @@ private struct EQSlider: View {
 private struct AlbumPlaceholder: View {
 
     @ObservedObject var audio: AudioPlayer
+    @State private var artworkImage: NSImage?
 
     var body: some View {
 
@@ -1209,12 +1189,7 @@ private struct AlbumPlaceholder: View {
                     Rectangle()
                         .fill(Color.black.opacity(0.65))
 
-                    if let artworkData =
-                        audio.currentTrack?.artwork,
-                       let nsImage =
-                        NSImage(
-                            data: artworkData
-                        ) {
+                    if let nsImage = artworkImage {
 
                         Image(nsImage: nsImage)
                             .resizable()
@@ -1294,6 +1269,21 @@ private struct AlbumPlaceholder: View {
             )
             .padding(5)
         }
+        .onAppear {
+            updateArtworkImage()
+        }
+        .onChange(of: audio.currentTrack?.url) { _ in
+            updateArtworkImage()
+        }
+    }
+
+    private func updateArtworkImage() {
+        guard let artworkData = audio.currentTrack?.artwork else {
+            artworkImage = nil
+            return
+        }
+
+        artworkImage = NSImage(data: artworkData)
     }
 }
 
@@ -1303,17 +1293,32 @@ private struct CassetteBayPlaceholder: View {
 
     @ObservedObject var audio: AudioPlayer
 
+    private static let bayImage = loadCassetteImage("cassette_bay")
+    private static let reelImage = loadCassetteImage("katushka")
+    private static let cassetteImages: [String: NSImage] =
+        Dictionary(
+            uniqueKeysWithValues: [
+                "cassette",
+                "cassette_02",
+                "cassette_03",
+                "cassette_04",
+                "cassette_05",
+                "cassette_06",
+                "cassette_07"
+            ].compactMap { name in
+                guard let image = loadCassetteImage(name) else {
+                    return nil
+                }
+
+                return (name, image)
+            }
+        )
+
     var body: some View {
 
         ZStack {
 
-            if let bayURL =
-                Bundle.module.url(
-                    forResource: "cassette_bay",
-                    withExtension: "png"
-                ),
-                let bayImage =
-                    NSImage(contentsOf: bayURL) {
+            if let bayImage = Self.bayImage {
 
                 Image(nsImage: bayImage)
                     .resizable()
@@ -1325,13 +1330,7 @@ private struct CassetteBayPlaceholder: View {
 
             if audio.currentTrack != nil {
 
-                if let cassetteURL =
-                    Bundle.module.url(
-                        forResource: audio.cassetteName,
-                        withExtension: "png"
-                    ),
-                    let cassetteImage =
-                        NSImage(contentsOf: cassetteURL) {
+                if let cassetteImage = Self.cassetteImages[audio.cassetteName] {
 
                     Image(nsImage: cassetteImage)
                         .resizable()
@@ -1345,39 +1344,28 @@ private struct CassetteBayPlaceholder: View {
                         )
                 }
 
-                let reelAngle =
-                    audio.currentTime * 180.0
+                if let reelImage = Self.reelImage {
 
-                if let reelURL =
-                    Bundle.module.url(
-                        forResource: "katushka",
-                        withExtension: "png"
-                    ),
-                    let reelImage =
-                        NSImage(contentsOf: reelURL) {
-
-                    Image(nsImage: reelImage)
-                        .resizable()
+                    CassetteReelView(
+                        image: reelImage,
+                        isPlaying: audio.isPlaying
+                    )
                         .frame(
                             width: 25,
                             height: 25
-                        )
-                        .rotationEffect(
-                            .degrees(-reelAngle)
                         )
                         .offset(
                             x: -50,
                             y: -8
                         )
 
-                    Image(nsImage: reelImage)
-                        .resizable()
+                    CassetteReelView(
+                        image: reelImage,
+                        isPlaying: audio.isPlaying
+                    )
                         .frame(
                             width: 25,
                             height: 25
-                        )
-                        .rotationEffect(
-                            .degrees(-reelAngle)
                         )
                         .offset(
                             x: 38,
@@ -1401,6 +1389,140 @@ private struct CassetteBayPlaceholder: View {
     }
 }
 
+private struct CassetteReelView: NSViewRepresentable {
+
+    let image: NSImage
+    let isPlaying: Bool
+
+    func makeNSView(context: Context) -> CassetteReelLayerView {
+
+        let view = CassetteReelLayerView()
+        view.image = image
+        view.setSpinning(isPlaying)
+        return view
+    }
+
+    func updateNSView(
+        _ view: CassetteReelLayerView,
+        context: Context
+    ) {
+
+        if view.image !== image {
+            view.image = image
+        }
+
+        view.setSpinning(isPlaying)
+    }
+}
+
+private final class CassetteReelLayerView: NSView {
+
+    private let reelLayer = CALayer()
+
+    var image: NSImage? {
+        didSet {
+            guard let image,
+                  let cgImage = image.cgImage(
+                    forProposedRect: nil,
+                    context: nil,
+                    hints: nil
+                  )
+            else {
+                reelLayer.contents = nil
+                return
+            }
+
+            reelLayer.contents = cgImage
+            reelLayer.contentsGravity = .resizeAspect
+            reelLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
+        }
+    }
+
+    private var isSpinning = false
+    private var rotation: CGFloat = 0
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        configureReelLayer()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+        configureReelLayer()
+    }
+
+    override func layout() {
+        super.layout()
+
+        reelLayer.bounds = CGRect(
+            origin: .zero,
+            size: bounds.size
+        )
+        reelLayer.position = CGPoint(
+            x: bounds.midX,
+            y: bounds.midY
+        )
+    }
+
+    private func configureReelLayer() {
+        reelLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        layer?.addSublayer(reelLayer)
+    }
+
+    func setSpinning(_ spinning: Bool) {
+
+        guard spinning != isSpinning
+        else {
+            return
+        }
+
+        isSpinning = spinning
+
+        if spinning {
+            let animation = CABasicAnimation(
+                keyPath: "transform.rotation.z"
+            )
+            animation.fromValue = rotation
+            animation.toValue = rotation + 2 * .pi
+            animation.duration = 2.5
+            animation.repeatCount = .infinity
+            animation.timingFunction = CAMediaTimingFunction(name: .linear)
+            reelLayer.add(animation, forKey: "cassetteReelSpin")
+        } else {
+            if let presentation = reelLayer.presentation() {
+                rotation = atan2(
+                    presentation.transform.m12,
+                    presentation.transform.m11
+                )
+            }
+
+            reelLayer.removeAnimation(forKey: "cassetteReelSpin")
+            reelLayer.transform = CATransform3DMakeRotation(
+                rotation,
+                0,
+                0,
+                1
+            )
+        }
+    }
+}
+
+private func loadCassetteImage(_ name: String) -> NSImage? {
+
+    guard let url =
+        Bundle.module.url(
+            forResource: name,
+            withExtension: "png"
+        )
+    else {
+        return nil
+    }
+
+    return NSImage(contentsOf: url)
+}
+
 // MARK: - Cassette button
 
 private struct CassetteButtonPlaceholder: View {
@@ -1408,6 +1530,25 @@ private struct CassetteButtonPlaceholder: View {
     let size: CGSize
 
     @ObservedObject var audio: AudioPlayer
+
+    private static let cassetteImages: [String: NSImage] =
+        Dictionary(
+            uniqueKeysWithValues: [
+                "cassette",
+                "cassette_02",
+                "cassette_03",
+                "cassette_04",
+                "cassette_05",
+                "cassette_06",
+                "cassette_07"
+            ].compactMap { name in
+                guard let image = loadCassetteImage(name) else {
+                    return nil
+                }
+
+                return (name, image)
+            }
+        )
 
     var body: some View {
 
@@ -1436,17 +1577,9 @@ private struct CassetteButtonPlaceholder: View {
                 )
                 .padding(3)
 
-            HStack(
-                spacing: 8
-            ) {
+            HStack(spacing: 6) {
 
-                if let cassetteURL =
-                    Bundle.module.url(
-                        forResource: audio.cassetteName,
-                        withExtension: "png"
-                    ),
-                    let cassetteImage =
-                        NSImage(contentsOf: cassetteURL) {
+                if let cassetteImage = Self.cassetteImages[audio.cassetteName] {
 
                     Image(nsImage: cassetteImage)
                         .resizable()
@@ -1454,8 +1587,8 @@ private struct CassetteButtonPlaceholder: View {
                             contentMode: .fit
                         )
                         .frame(
-                            width: 59,
-                            height: 31
+                            width: 56,
+                            height: 29
                         )
                         .clipped()
                 }
@@ -1473,11 +1606,11 @@ private struct CassetteButtonPlaceholder: View {
                 }
                 .buttonStyle(
                     TransportButtonStyle(
-                        title: "↻",
+                        title: "CH",
                         isActive: false,
                         momentary: true,
-                        buttonWidth: 65,
-                        buttonHeight: 39
+                        buttonWidth: 61,
+                        buttonHeight: 33
                     )
                 )
             }
@@ -1499,6 +1632,7 @@ private struct TimerPlaceholder: View {
 
     let size: CGSize
     @ObservedObject var audio: AudioPlayer
+    @ObservedObject var playbackClock: PlaybackClock
 
     private let glassGreen = Color(
         red: 0.015,
@@ -1519,7 +1653,7 @@ private struct TimerPlaceholder: View {
             Int(
                 ceil(
                     audio.duration
-                    - audio.currentTime
+                    - playbackClock.currentTime
                 )
             )
         )
@@ -2031,8 +2165,9 @@ private struct TransportPlaceholder: View {
     let size: CGSize
 
     @ObservedObject var audio: AudioPlayer
+    @ObservedObject var playbackClock: PlaybackClock
 
-    private let buttonWidth: CGFloat = 65
+    private let buttonWidth: CGFloat = 61
     private let buttonHeight: CGFloat = 39
 
     var body: some View {
@@ -2050,18 +2185,18 @@ private struct TransportPlaceholder: View {
                 HStack(spacing: 4) {
 
                     transportButton(
-                        "▶",
-                        isActive: audio.isPlaying
+                        "Ⅱ",
+                        isActive:
+                            !audio.isPlaying
+                            && audio.currentTrack != nil
+                            && playbackClock.currentTime > 0
                     ) {
                         audio.togglePlayPause()
                     }
 
                     transportButton(
-                        "Ⅱ",
-                        isActive:
-                            !audio.isPlaying
-                            && audio.currentTrack != nil
-                            && audio.currentTime > 0
+                        "▶",
+                        isActive: audio.isPlaying
                     ) {
                         audio.togglePlayPause()
                     }
@@ -2105,7 +2240,7 @@ private struct TransportPlaceholder: View {
                             !audio.isPlaying
                             && (
                                 audio.currentTrack == nil
-                                || audio.currentTime == 0
+                                || playbackClock.currentTime == 0
                             )
                     ) {
                         audio.stop()
@@ -2285,10 +2420,13 @@ private struct LowerButtonsPlaceholder: View {
     @Binding var showPlaylist: Bool
     @Binding var showLibrary: Bool
 
+    let onTogglePlaylist: () -> Void
+    let onClosePlaylist: () -> Void
+
     var body: some View {
 
         HStack(
-            spacing: 4
+            spacing: 5
         ) {
 
             // EQ
@@ -2370,13 +2508,14 @@ private struct LowerButtonsPlaceholder: View {
                 active: showLibrary
             ) {
 
+                onClosePlaylist()
+
                 withAnimation(
                     .easeInOut(
-                        duration: 0.32
+                        duration: 0.42
                     )
                 ) {
 
-                    showPlaylist = false
                     showLibrary.toggle()
                 }
 
@@ -2397,12 +2536,7 @@ private struct LowerButtonsPlaceholder: View {
             lowerButton(
                 active: showPlaylist
             ) {
-
-                withAnimation(
-                    .easeInOut(duration: 0.32)
-                ) {
-                    showPlaylist.toggle()
-                }
+                onTogglePlaylist()
 
             } content: {
 
@@ -2497,7 +2631,7 @@ private struct LowerButtonsPlaceholder: View {
                     )
             }
             .frame(
-                width: 58,
+                width: 59,
                 height: 35
             )
         }
@@ -2566,13 +2700,13 @@ private struct VolumePlaceholder: View {
             }
             .font(
                 .system(
-                    size: 6,
+                    size: 8,
                     weight: .regular,
                     design: .monospaced
                 )
             )
             .foregroundStyle(
-                PanelMaterials.marking.opacity(0.55)
+                PanelMaterials.marking.opacity(0.68)
             )
 
             GeometryReader { geometry in
@@ -2689,6 +2823,7 @@ private struct ProgressPlaceholder: View {
     let size: CGSize
 
     @ObservedObject var audio: AudioPlayer
+    @ObservedObject var playbackClock: PlaybackClock
 
     @State private var isDragging = false
     @State private var dragTime: TimeInterval = 0
@@ -2703,7 +2838,7 @@ private struct ProgressPlaceholder: View {
             let displayedTime =
                 isDragging
                     ? dragTime
-                    : audio.currentTime
+                    : playbackClock.currentTime
 
             let progress: CGFloat =
                 duration > 0
@@ -2744,13 +2879,13 @@ private struct ProgressPlaceholder: View {
                     }
                     .font(
                         .system(
-                            size: 7,
+                            size: 9,
                             weight: .regular,
                             design: .monospaced
                         )
                     )
                     .foregroundStyle(
-                        PanelMaterials.marking.opacity(0.55)
+                        PanelMaterials.marking.opacity(0.68)
                     )
 
                     GeometryReader { trackGeometry in
@@ -2848,7 +2983,7 @@ private struct ProgressPlaceholder: View {
 
                                     isDragging = true
                                     dragTime =
-                                        audio.currentTime
+                                        playbackClock.currentTime
                                 }
 
                                 let x =

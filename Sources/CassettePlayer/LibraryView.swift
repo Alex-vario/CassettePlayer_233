@@ -13,6 +13,7 @@ struct LibraryView: View {
     @State private var rootFiles: [URL] = []
     @State private var selectedRoot: URL?
     @State private var isLoading = false
+    @State private var isContentVisible = false
 
     @State private var libraryMode = 0
     @State private var artists: [ArtistGroup] = []
@@ -27,19 +28,36 @@ struct LibraryView: View {
 
             PanelMaterials.mainPanel
 
-            VStack(spacing: 0) {
+            if isContentVisible {
+                VStack(spacing: 0) {
+                    header
 
-                header
+                    Divider()
+                        .background(
+                            Color.black.opacity(0.7)
+                        )
 
-                Divider()
-                    .background(
-                        Color.black.opacity(0.7)
-                    )
-
-                content
+                    content
+                }
+                .transition(.opacity)
             }
         }
+        .animation(
+            .easeOut(duration: 0.14),
+            value: isContentVisible
+        )
         .task {
+            do {
+                try await Task.sleep(nanoseconds: 460_000_000)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            isContentVisible = true
             loadSavedRoot()
         }
     }
@@ -469,11 +487,13 @@ struct LibraryView: View {
         ) {
 
             ForEach(
-                artists
-            ) { artist in
+                Array(artists.enumerated()),
+                id: \.element.id
+            ) { index, artist in
 
                 ArtistTile(
                     artist: artist,
+                    artworkRevealDelay: Double(index % 7) * 0.04,
                     onOpen: {
 
                         selectedArtist = artist
@@ -1184,9 +1204,12 @@ private struct ArtistGroup:
 private struct ArtistTile: View {
 
     let artist: ArtistGroup
+    let artworkRevealDelay: Double
 
     let onOpen: () -> Void
     let onPlay: () -> Void
+
+    @State private var artworkVisible = false
 
     var body: some View {
 
@@ -1267,6 +1290,15 @@ private struct ArtistTile: View {
                         height: side
                     )
                     .clipped()
+                    .opacity(artworkVisible ? 1 : 0)
+                    .animation(
+                        .easeOut(duration: 0.24)
+                            .delay(artworkRevealDelay),
+                        value: artworkVisible
+                    )
+                    .onAppear {
+                        artworkVisible = true
+                    }
 
                 } else {
 
@@ -1882,7 +1914,7 @@ private func findArtwork(
         return nil
     }
 
-    for case let url as URL in enumerator {
+    while let url = enumerator.nextObject() as? URL {
 
         guard
             [
