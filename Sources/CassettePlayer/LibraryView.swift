@@ -248,7 +248,8 @@ struct LibraryView: View {
                         )
 
                     content
-                }                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .transition(.opacity)
             }
         }
