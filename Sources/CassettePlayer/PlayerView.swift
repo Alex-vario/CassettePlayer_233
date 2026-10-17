@@ -153,144 +153,108 @@ struct PlayerView: View {
     private func handleDrop(
         _ providers: [NSItemProvider]
     ) {
-
-        guard let provider = providers.first else {
+        guard !providers.isEmpty else {
             return
         }
 
-        provider.loadItem(
-            forTypeIdentifier: UTType.fileURL.identifier,
-            options: nil
-        ) { item, error in
-
-            guard error == nil else {
-                return
-            }
-
-            var url: URL?
-
-            if let item = item as? URL {
-                url = item
-
-            } else if let item = item as? NSURL {
-                url = item as URL
-
-            } else if let data = item as? Data {
-                url = URL(
-                    dataRepresentation: data,
-                    relativeTo: nil
-                )
-            }
-
-            guard let droppedURL = url else {
-                return
+        Task {
+            var droppedURLs: [URL] = []
+            for provider in providers {
+                if let url = await loadDroppedURL(from: provider) {
+                    droppedURLs.append(url)
+                }
             }
 
             let fileManager = FileManager.default
-
-            var isDirectory: ObjCBool = false
-
-            guard fileManager.fileExists(
-                atPath: droppedURL.path,
-                isDirectory: &isDirectory
-            ) else {
-                return
-            }
-
             let supportedExtensions: Set<String> = [
-                "mp3",
-                "m4a",
-                "aac",
-                "wav",
-                "aiff",
-                "aif",
-                "flac"
+                "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac"
             ]
+            var audioURLs: [URL] = []
 
-            var urls: [URL] = []
+            for droppedURL in droppedURLs {
+                var isDirectory: ObjCBool = false
+                guard fileManager.fileExists(
+                    atPath: droppedURL.path,
+                    isDirectory: &isDirectory
+                ) else {
+                    continue
+                }
 
-            if isDirectory.boolValue {
-
-                if let enumerator =
-                    fileManager.enumerator(
+                if isDirectory.boolValue {
+                    guard let enumerator = fileManager.enumerator(
                         at: droppedURL,
-                        includingPropertiesForKeys: [
-                            .isRegularFileKey,
-                            .isDirectoryKey
-                        ],
-                        options: [
-                            .skipsHiddenFiles,
-                            .skipsPackageDescendants
-                        ]
-                    ) {
+                        includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
+                        options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                    ) else {
+                        continue
+                    }
 
                     for case let fileURL as URL in enumerator {
-
-                        let ext =
-                            fileURL
-                            .pathExtension
-                            .lowercased()
-
-                        guard supportedExtensions.contains(ext)
-                        else {
+                        guard supportedExtensions.contains(fileURL.pathExtension.lowercased()) else {
                             continue
                         }
-
                         do {
-                            let values =
-                                try fileURL.resourceValues(
-                                    forKeys: [
-                                        .isRegularFileKey
-                                    ]
-                                )
-
-                            guard values.isRegularFile == true
-                            else {
-                                continue
+                            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+                            if values.isRegularFile == true {
+                                audioURLs.append(fileURL)
                             }
-
-                            urls.append(fileURL)
-
                         } catch {
                             continue
                         }
                     }
+                } else if supportedExtensions.contains(droppedURL.pathExtension.lowercased()) {
+                    audioURLs.append(droppedURL)
                 }
-
-            } else {
-
-                let ext =
-                    droppedURL
-                    .pathExtension
-                    .lowercased()
-
-                guard supportedExtensions.contains(ext)
-                else {
-                    return
-                }
-
-                urls.append(droppedURL)
             }
 
-            guard !urls.isEmpty else {
+            // Avoid duplicates if a folder and one of its files were dropped together.
+            var seen = Set<URL>()
+            audioURLs = audioURLs.filter {
+                seen.insert($0.standardizedFileURL).inserted
+            }
+            audioURLs.sort {
+                $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+            }
+
+            guard !audioURLs.isEmpty else {
                 return
             }
 
-            urls.sort {
-                $0.lastPathComponent.localizedStandardCompare(
-                    $1.lastPathComponent
-                ) == .orderedAscending
+            let tracks = await AudioTrack.loadAll(from: audioURLs)
+            guard !tracks.isEmpty else {
+                return
             }
 
-            Task {
-                let tracks = await AudioTrack.loadAll(from: urls)
+            await MainActor.run {
+                audio.setPlaylist(tracks)
+                if let firstTrack = tracks.first {
+                    audio.play(firstTrack)
+                }
+            }
+        }
+    }
 
-                DispatchQueue.main.async {
-                    audio.setPlaylist(tracks)
+    private func loadDroppedURL(
+        from provider: NSItemProvider
+    ) async -> URL? {
+        await withCheckedContinuation { continuation in
+            provider.loadItem(
+                forTypeIdentifier: UTType.fileURL.identifier,
+                options: nil
+            ) { item, error in
+                guard error == nil else {
+                    continuation.resume(returning: nil)
+                    return
+                }
 
-                    if let firstTrack = tracks.first {
-                        audio.play(firstTrack)
-                    }
+                if let url = item as? URL {
+                    continuation.resume(returning: url)
+                } else if let url = item as? NSURL {
+                    continuation.resume(returning: url as URL)
+                } else if let data = item as? Data {
+                    continuation.resume(returning: URL(dataRepresentation: data, relativeTo: nil))
+                } else {
+                    continuation.resume(returning: nil)
                 }
             }
         }
