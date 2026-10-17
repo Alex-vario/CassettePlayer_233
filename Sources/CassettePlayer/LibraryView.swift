@@ -217,9 +217,10 @@ struct LibraryView: View {
     @State private var libraryMode = 0
     @State private var artists: [ArtistGroup] = []
     @State private var selectedArtist: ArtistGroup?
-    @State private var artistFilterText = ""
 
-    @State private var searchText = ""
+    @AppStorage("CassettePlayer.Library.FilterMode")
+    private var libraryFilterMode = "folder"
+    @State private var libraryFilterText = ""
     @State private var searchFolders: [URL] = []
     @State private var searchTracks: [AudioTrack] = []
     @State private var isSearchIndexLoading = false
@@ -247,8 +248,7 @@ struct LibraryView: View {
                         )
 
                     content
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                }                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .transition(.opacity)
             }
         }
@@ -271,16 +271,19 @@ struct LibraryView: View {
             isContentVisible = true
             loadSavedRoot()
         }
-        .onChange(of: searchText) { newValue in
+        .onChange(of: libraryFilterText) { newValue in
             if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 loadSearchIndexIfNeeded()
             }
+        }
+        .onChange(of: libraryFilterMode) { _ in
+            libraryFilterText = ""
         }
         .onChange(of: selectedRoot) { _ in
             searchIndexRootPath = nil
             searchFolders = []
             searchTracks = []
-            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if !libraryFilterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 loadSearchIndexIfNeeded()
             }
         }
@@ -335,35 +338,42 @@ struct LibraryView: View {
 
             Spacer(minLength: 4)
 
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.55))
+            HStack(spacing: 4) {
+                filterModeButton(title: "ПАПКИ", mode: "folder")
+                filterModeButton(title: "ИСП.", mode: "artist")
+                filterModeButton(title: "ТРЕК", mode: "track")
 
-                TextField("Поиск по библиотеке", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.92))
-                    .disableAutocorrection(true)
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.55))
 
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.white.opacity(0.55))
+                    TextField(filterPlaceholder, text: $libraryFilterText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.white.opacity(0.92))
+                        .disableAutocorrection(true)
+
+                    if !libraryFilterText.isEmpty {
+                        Button {
+                            libraryFilterText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.white.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Очистить фильтр")
                     }
-                    .buttonStyle(.plain)
-                    .help("Очистить поиск")
                 }
+                .padding(.leading, 5)
+                .frame(minWidth: 105, maxWidth: 175)
             }
-            .padding(.horizontal, 8)
-            .frame(minWidth: 150, maxWidth: 260)
+            .padding(.horizontal, 6)
             .frame(height: 25)
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.10), lineWidth: 1))
-            .help("Поиск по папкам, исполнителям, альбомам и трекам")
+            .help("Выберите режим фильтрации: папки, исполнители или треки")
 
             Slider(
                 value: $libraryTileSize,
@@ -428,6 +438,36 @@ struct LibraryView: View {
         .background(
             Color.black.opacity(0.30)
         )
+    }
+
+    private var filterPlaceholder: String {
+        switch libraryFilterMode {
+        case "artist": return "Имя исполнителя…"
+        case "track": return "Название трека…"
+        default: return "Название папки…"
+        }
+    }
+
+    private func filterModeButton(title: String, mode: String) -> some View {
+        let active = libraryFilterMode == mode
+
+        return Button {
+            guard libraryFilterMode != mode else { return }
+            libraryFilterMode = mode
+            libraryFilterText = ""
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: active ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 9, weight: .medium))
+                Text(title)
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+            }
+            .foregroundStyle(active ? Color.white.opacity(0.95) : Color.white.opacity(0.48))
+            .padding(.horizontal, 3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Фильтр: \(title.lowercased())")
     }
 
     // MARK: - Header Buttons
@@ -497,8 +537,7 @@ struct LibraryView: View {
                     )
                     .font(
                         .system(
-                            size: 10,
-                            weight: .medium,
+                            size: 10,                            weight: .medium,
                             design: .monospaced
                         )
                     )
@@ -647,7 +686,7 @@ struct LibraryView: View {
 
         Group {
 
-            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if !normalizedFilterQuery.isEmpty {
                 searchResultsContent
             } else if isLoading {
 
@@ -667,44 +706,31 @@ struct LibraryView: View {
 
     // MARK: - Search
 
-    private var normalizedSearchQuery: String {
-        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var normalizedFilterQuery: String {
+        libraryFilterText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var matchingSearchFolders: [URL] {
-        guard !normalizedSearchQuery.isEmpty else { return [] }
+        guard !normalizedFilterQuery.isEmpty else { return [] }
         return searchFolders
-            .filter { $0.lastPathComponent.localizedCaseInsensitiveContains(normalizedSearchQuery) }
+            .filter { $0.lastPathComponent.localizedCaseInsensitiveContains(normalizedFilterQuery) }
             .sorted {
                 $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
             }
     }
 
     private var matchingSearchArtists: [ArtistGroup] {
-        guard !normalizedSearchQuery.isEmpty else { return [] }
-        let grouped = Dictionary(grouping: searchTracks.filter { track in
-            let name = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-            return !name.isEmpty && name.localizedCaseInsensitiveContains(normalizedSearchQuery)
-        }) { $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-        return grouped.map { name, tracks in
-            ArtistGroup(
-                name: name,
-                tracks: tracks.sorted {
-                    $0.title.localizedStandardCompare($1.title) == .orderedAscending
-                }
-            )
-        }.sorted {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        guard !normalizedFilterQuery.isEmpty else { return [] }
+        return artists.filter {
+            $0.name.localizedCaseInsensitiveContains(normalizedFilterQuery)
         }
     }
 
     private var matchingSearchTracks: [AudioTrack] {
-        guard !normalizedSearchQuery.isEmpty else { return [] }
+        guard !normalizedFilterQuery.isEmpty else { return [] }
         return searchTracks
             .filter {
-                $0.title.localizedCaseInsensitiveContains(normalizedSearchQuery)
-                    || $0.album.localizedCaseInsensitiveContains(normalizedSearchQuery)
+                $0.title.localizedCaseInsensitiveContains(normalizedFilterQuery)
             }
             .sorted {
                 $0.title.localizedStandardCompare($1.title) == .orderedAscending
@@ -715,7 +741,7 @@ struct LibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if isSearchIndexLoading {
-                    ProgressView("Индексирую библиотеку…")
+                    ProgressView("Подготавливаю фильтр…")
                         .controlSize(.small)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 28)
@@ -724,84 +750,89 @@ struct LibraryView: View {
                         .foregroundStyle(Color.white.opacity(0.6))
                         .frame(maxWidth: .infinity)
                         .padding(.top, 28)
-                } else if matchingSearchFolders.isEmpty
-                            && matchingSearchArtists.isEmpty
-                            && matchingSearchTracks.isEmpty {
-                    Text("Ничего не найдено")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.white.opacity(0.55))
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 28)
                 } else {
-                    if !matchingSearchFolders.isEmpty {
-                        searchSectionTitle("ПАПКИ", count: matchingSearchFolders.count)
-                        ForEach(matchingSearchFolders, id: \.standardizedFileURL.path) { folder in
-                            Button {
-                                searchText = ""
-                                playFolder(folder)
-                            } label: {
-                                HStack(spacing: 9) {
-                                    Image(systemName: "folder.fill")
-                                        .foregroundStyle(Color.white.opacity(0.7))
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(folder.lastPathComponent)
+                    switch libraryFilterMode {
+                    case "artist":
+                        if matchingSearchArtists.isEmpty {
+                            noFilterResults("Исполнители не найдены")
+                        } else {
+                            searchSectionTitle("ИСПОЛНИТЕЛИ", count: matchingSearchArtists.count)
+                            ForEach(matchingSearchArtists) { artist in
+                                Button {
+                                    libraryFilterText = ""
+                                    playArtist(artist)
+                                } label: {
+                                    HStack(spacing: 9) {
+                                        Image(systemName: "person.fill")
+                                            .foregroundStyle(Color.white.opacity(0.7))
+                                        Text(artist.name)
                                             .foregroundStyle(Color.white.opacity(0.92))
-                                        Text(folder.deletingLastPathComponent().lastPathComponent)
-                                            .font(.system(size: 10))
+                                        Spacer()
+                                        Text("\(artist.tracks.count) тр.")
+                                            .font(.system(size: 10, design: .monospaced))
                                             .foregroundStyle(Color.white.opacity(0.45))
                                     }
-                                    Spacer()
-                                    Image(systemName: "arrow.up.left")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(Color.white.opacity(0.35))
+                                    .font(.system(size: 12))
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 7)
+                                    .contentShape(Rectangle())
                                 }
-                                .font(.system(size: 12))
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 7)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
-                    }
 
-                    if !matchingSearchArtists.isEmpty {
-                        searchSectionTitle("ИСПОЛНИТЕЛИ", count: matchingSearchArtists.count)
-                        ForEach(matchingSearchArtists) { artist in
-                            Button {
-                                searchText = ""
-                                playArtist(artist)
-                            } label: {
-                                HStack(spacing: 9) {
-                                    Image(systemName: "person.fill")
-                                        .foregroundStyle(Color.white.opacity(0.7))
-                                    Text(artist.name)
-                                        .foregroundStyle(Color.white.opacity(0.92))
-                                    Spacer()
-                                    Text("\(artist.tracks.count) тр.")
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundStyle(Color.white.opacity(0.45))
-                                }
-                                .font(.system(size: 12))
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 7)
-                                .contentShape(Rectangle())
+                    case "track":
+                        if matchingSearchTracks.isEmpty {
+                            noFilterResults("Треки не найдены")
+                        } else {
+                            searchSectionTitle("ТРЕКИ", count: matchingSearchTracks.count)
+                            ForEach(matchingSearchTracks) { track in
+                                TrackRow(
+                                    url: track.url,
+                                    isCurrent: audio.currentTrack?.url == track.url,
+                                    onPlay: {
+                                        audio.setPlaylist(matchingSearchTracks)
+                                        audio.play(track)
+                                        onClose()
+                                    }
+                                )
                             }
-                            .buttonStyle(.plain)
                         }
-                    }
 
-                    if !matchingSearchTracks.isEmpty {
-                        searchSectionTitle("ТРЕКИ", count: matchingSearchTracks.count)
-                        ForEach(matchingSearchTracks) { track in
-                            TrackRow(
-                                url: track.url,
-                                isCurrent: audio.currentTrack?.url == track.url,
-                                onPlay: {
-                                    audio.setPlaylist(matchingSearchTracks)
-                                    audio.play(track)
-                                    onClose()
+                    default:
+                        if matchingSearchFolders.isEmpty {
+                            noFilterResults("Папки не найдены")
+                        } else {
+                            searchSectionTitle("ПАПКИ", count: matchingSearchFolders.count)
+                            ForEach(matchingSearchFolders, id: \.standardizedFileURL.path) { folder in
+                                Button {
+                                    libraryFilterText = ""
+                                    libraryMode = 0
+                                    selectedArtist = nil
+                                    openFolder(folder)
+                                } label: {
+                                    HStack(spacing: 9) {
+                                        Image(systemName: "folder.fill")
+                                            .foregroundStyle(Color.white.opacity(0.7))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(folder.lastPathComponent)
+                                                .foregroundStyle(Color.white.opacity(0.92))
+                                            Text(folder.deletingLastPathComponent().lastPathComponent)
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(Color.white.opacity(0.45))
+                                        }
+                                        Spacer()
+                                        Image(systemName: "arrow.up.left")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Color.white.opacity(0.35))
+                                    }
+                                    .font(.system(size: 12))
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 7)
+                                    .contentShape(Rectangle())
                                 }
-                            )
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
@@ -809,6 +840,14 @@ struct LibraryView: View {
             .padding(12)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private func noFilterResults(_ message: String) -> some View {
+        Text(message)
+            .font(.system(size: 12))
+            .foregroundStyle(Color.white.opacity(0.55))
+            .frame(maxWidth: .infinity)
+            .padding(.top, 28)
     }
 
     private func searchSectionTitle(_ title: String, count: Int) -> some View {
@@ -836,7 +875,7 @@ struct LibraryView: View {
             guard selectedRoot?.standardizedFileURL.path == index.rootPath else {
                 isSearchIndexLoading = false
                 searchIndexRootPath = nil
-                if !normalizedSearchQuery.isEmpty {
+                if !normalizedFilterQuery.isEmpty {
                     loadSearchIndexIfNeeded()
                 }
                 return
@@ -925,11 +964,9 @@ struct LibraryView: View {
 
                 } else {
 
-                    artistFilterBar
-
                     if filteredArtists.isEmpty {
                         Text(
-                            artistFilterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            normalizedFilterQuery.isEmpty
                                 ? "В библиотеке пока нет исполнителей"
                                 : "Исполнители не найдены"
                         )
@@ -947,55 +984,14 @@ struct LibraryView: View {
         .scrollIndicators(.hidden)
     }
 
-    private var normalizedArtistFilter: String {
-        artistFilterText.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private var filteredArtists: [ArtistGroup] {
-        guard !normalizedArtistFilter.isEmpty else {
+        guard !normalizedFilterQuery.isEmpty else {
             return artists
         }
 
         return artists.filter {
-            $0.name.localizedCaseInsensitiveContains(normalizedArtistFilter)
+            $0.name.localizedCaseInsensitiveContains(normalizedFilterQuery)
         }
-    }
-
-    private var artistFilterBar: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.52))
-
-            TextField("Фильтр исполнителей…", text: $artistFilterText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundStyle(Color.white.opacity(0.92))
-                .disableAutocorrection(true)
-
-            if !artistFilterText.isEmpty {
-                Button {
-                    artistFilterText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.white.opacity(0.55))
-                }
-                .buttonStyle(.plain)
-                .help("Очистить фильтр исполнителей")
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(width: 280, height: 30, alignment: .leading)
-        .background(
-            Color.white.opacity(0.07),
-            in: RoundedRectangle(cornerRadius: 7)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(Color.white.opacity(0.10), lineWidth: 1)
-        )
-        .help("Фильтрует только список исполнителей")
     }
 
     private var artistGrid: some View {
@@ -1247,8 +1243,7 @@ struct LibraryView: View {
             let index = await LibraryIndexStore.shared.load(root: root)
             guard selectedRoot?.standardizedFileURL.path == index.rootPath else {
                 isLoading = false
-                return
-            }
+                return            }
             artists = Self.makeArtistGroups(from: index.tracks)
             isLoading = false
         }
@@ -1319,7 +1314,7 @@ struct LibraryView: View {
         }
 
         isLoading = true
-        isSearchIndexLoading = !normalizedSearchQuery.isEmpty
+        isSearchIndexLoading = !normalizedFilterQuery.isEmpty
 
         Task {
             let index = await LibraryIndexStore.shared.load(root: root, forceRefresh: true)
@@ -1497,8 +1492,7 @@ struct LibraryView: View {
 
         UserDefaults.standard.set(
             url.path,
-            forKey: rootDefaultsKey
-        )
+            forKey: rootDefaultsKey        )
 
         currentFolder = url
         selectedArtist = nil
@@ -1747,7 +1741,6 @@ private struct ArtistGroup:
     var artwork: NSImage? {
 
         for track in tracks {
-
             if let data = track.artwork,
                let image = NSImage(data: data)
             {
@@ -1997,8 +1990,7 @@ private struct ArtistTile: View {
             .system(
                 size: 38,
                 weight: .regular
-            )
-        )
+            )        )
         .foregroundStyle(
             Color.white.opacity(0.18)
         )
@@ -2247,8 +2239,7 @@ private struct FolderTitleScroller: View {
                         .offset(
                             x:
                                 8
-                                + offset
-                        )
+                                + offset                        )
 
                     Spacer(
                         minLength: 0
@@ -2497,7 +2488,6 @@ private func findArtwork(
     }
 
     while let url = enumerator.nextObject() as? URL {
-
         guard
             [
                 "mp3",
