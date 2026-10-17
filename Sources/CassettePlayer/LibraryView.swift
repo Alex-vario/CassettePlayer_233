@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import AVFoundation
+import CryptoKit
 
 // MARK: - Persistent Library Index
 
@@ -11,17 +12,17 @@ private struct CachedLibraryTrack: Codable {
     let artist: String
     let album: String
     let bitrate: Int
-    let artwork: Data?
+    let artworkKey: String?
 
-    init(track: AudioTrack) {
+    init(track: AudioTrack, artworkKey: String?) {
         path = track.url.path
         artist = track.artist
         album = track.album
         bitrate = track.bitrate
-        artwork = track.artwork
+        self.artworkKey = artworkKey
     }
 
-    func makeTrack() -> AudioTrack {
+    func makeTrack(artwork: Data?) -> AudioTrack {
         var track = AudioTrack(url: URL(fileURLWithPath: path))
         track.artist = artist
         track.album = album
@@ -36,12 +37,13 @@ private struct CachedLibraryIndex: Codable {
     let rootPath: String
     let folderPaths: [String]
     let tracks: [CachedLibraryTrack]
+    let artworkByKey: [String: Data]
 
     var snapshot: LibraryIndexSnapshot {
         LibraryIndexSnapshot(
             rootPath: rootPath,
             folders: folderPaths.map { URL(fileURLWithPath: $0) },
-            tracks: tracks.map { $0.makeTrack() }
+            tracks: tracks.map { $0.makeTrack(artwork: $0.artworkKey.flatMap { artworkByKey[$0] }) }
         )
     }
 
@@ -49,7 +51,21 @@ private struct CachedLibraryIndex: Codable {
         version = 1
         rootPath = root.standardizedFileURL.path
         folderPaths = folders.map { $0.path }
-        self.tracks = tracks.map(CachedLibraryTrack.init(track:))
+
+        var uniqueArtwork: [String: Data] = [:]
+        self.tracks = tracks.map { track in
+            let key: String?
+            if let artwork = track.artwork {
+                let digest = SHA256.hash(data: artwork)
+                let digestKey = digest.map { String(format: "%02x", $0) }.joined()
+                uniqueArtwork[digestKey] = artwork
+                key = digestKey
+            } else {
+                key = nil
+            }
+            return CachedLibraryTrack(track: track, artworkKey: key)
+        }
+        artworkByKey = uniqueArtwork
     }
 }
 
@@ -104,8 +120,9 @@ private actor LibraryIndexStore {
         if !forceRefresh,
            buildRootPath == rootPath,
            let buildTask {
+            let generation = buildGeneration
             let result = await buildTask.value
-            if result.rootPath == rootPath {
+            if generation == buildGeneration, result.rootPath == rootPath {
                 cachedIndex = result
                 persist(result)
             }
