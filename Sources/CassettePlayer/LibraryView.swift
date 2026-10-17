@@ -19,12 +19,15 @@ struct LibraryView: View {
     @State private var artists: [ArtistGroup] = []
     @State private var selectedArtist: ArtistGroup?
 
+    @AppStorage("CassettePlayer.Library.TileSize")
+    private var libraryTileSize = 165.0
+
     private let rootDefaultsKey =
         "CassettePlayer.Library.Root"
 
     var body: some View {
 
-        ZStack {
+        ZStack(alignment: .top) {
 
             PanelMaterials.mainPanel
 
@@ -39,9 +42,11 @@ struct LibraryView: View {
 
                     content
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .transition(.opacity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(
             .easeOut(duration: 0.14),
             value: isContentVisible
@@ -111,6 +116,14 @@ struct LibraryView: View {
 
             Spacer(minLength: 4)
 
+            Slider(
+                value: $libraryTileSize,
+                in: 72...165
+            )
+            .frame(width: 100)
+            .help("Размер плиток")
+            .accessibilityLabel("Размер плиток библиотеки")
+
             Button {
                 chooseLibraryFolder()
             } label: {
@@ -128,6 +141,7 @@ struct LibraryView: View {
                     )
             }
             .buttonStyle(.plain)
+            .padding(.trailing, 8)
 
             Button {
                 onClose()
@@ -417,8 +431,8 @@ struct LibraryView: View {
             columns: [
                 GridItem(
                     .adaptive(
-                        minimum: 118,
-                        maximum: 165
+                        minimum: CGFloat(libraryTileSize),
+                        maximum: CGFloat(libraryTileSize)
                     ),
                     spacing: 10
                 )
@@ -477,8 +491,8 @@ struct LibraryView: View {
             columns: [
                 GridItem(
                     .adaptive(
-                        minimum: 118,
-                        maximum: 165
+                        minimum: CGFloat(libraryTileSize),
+                        maximum: CGFloat(libraryTileSize)
                     ),
                     spacing: 10
                 )
