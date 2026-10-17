@@ -19,8 +19,14 @@ struct LibraryView: View {
     @State private var artists: [ArtistGroup] = []
     @State private var selectedArtist: ArtistGroup?
 
+    @State private var searchText = ""
+    @State private var searchFolders: [URL] = []
+    @State private var searchTracks: [AudioTrack] = []
+    @State private var isSearchIndexLoading = false
+    @State private var searchIndexRootPath: String?
+
     @AppStorage("CassettePlayer.Library.TileSize")
-    private var libraryTileSize = 165.0
+    private var libraryTileSize = 120.0
 
     private let rootDefaultsKey =
         "CassettePlayer.Library.Root"
@@ -64,6 +70,19 @@ struct LibraryView: View {
 
             isContentVisible = true
             loadSavedRoot()
+        }
+        .onChange(of: searchText) { newValue in
+            if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                loadSearchIndexIfNeeded()
+            }
+        }
+        .onChange(of: selectedRoot) { _ in
+            searchIndexRootPath = nil
+            searchFolders = []
+            searchTracks = []
+            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                loadSearchIndexIfNeeded()
+            }
         }
     }
 
@@ -116,9 +135,39 @@ struct LibraryView: View {
 
             Spacer(minLength: 4)
 
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.55))
+
+                TextField("Поиск по библиотеке", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.92))
+                    .disableAutocorrection(true)
+
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Очистить поиск")
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(minWidth: 150, maxWidth: 260)
+            .frame(height: 25)
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.10), lineWidth: 1))
+            .help("Поиск по папкам, исполнителям, альбомам и трекам")
+
             Slider(
                 value: $libraryTileSize,
-                in: 72...165
+                in: 72...120
             )
             .frame(width: 100)
             .help("Размер плиток")
@@ -386,7 +435,9 @@ struct LibraryView: View {
 
         Group {
 
-            if isLoading {
+            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                searchResultsContent
+            } else if isLoading {
 
                 ProgressView()
                     .controlSize(.small)
@@ -400,6 +451,233 @@ struct LibraryView: View {
                 artistContent
             }
         }
+    }
+
+    // MARK: - Search
+
+    private var normalizedSearchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var matchingSearchFolders: [URL] {
+        guard !normalizedSearchQuery.isEmpty else { return [] }
+        return searchFolders
+            .filter { $0.lastPathComponent.localizedCaseInsensitiveContains(normalizedSearchQuery) }
+            .sorted {
+                $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+            }
+    }
+
+    private var matchingSearchArtists: [ArtistGroup] {
+        guard !normalizedSearchQuery.isEmpty else { return [] }
+        let grouped = Dictionary(grouping: searchTracks.filter { track in
+            let name = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !name.isEmpty && name.localizedCaseInsensitiveContains(normalizedSearchQuery)
+        }) { $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        return grouped.map { name, tracks in
+            ArtistGroup(
+                name: name,
+                tracks: tracks.sorted {
+                    $0.title.localizedStandardCompare($1.title) == .orderedAscending
+                }
+            )
+        }.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private var matchingSearchTracks: [AudioTrack] {
+        guard !normalizedSearchQuery.isEmpty else { return [] }
+        return searchTracks
+            .filter {
+                $0.title.localizedCaseInsensitiveContains(normalizedSearchQuery)
+                    || $0.album.localizedCaseInsensitiveContains(normalizedSearchQuery)
+            }
+            .sorted {
+                $0.title.localizedStandardCompare($1.title) == .orderedAscending
+            }
+    }
+
+    private var searchResultsContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if isSearchIndexLoading {
+                    ProgressView("Индексирую библиотеку…")
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
+                } else if searchIndexRootPath == nil {
+                    Text("Сначала выберите папку библиотеки")
+                        .foregroundStyle(Color.white.opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
+                } else if matchingSearchFolders.isEmpty
+                            && matchingSearchArtists.isEmpty
+                            && matchingSearchTracks.isEmpty {
+                    Text("Ничего не найдено")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
+                } else {
+                    if !matchingSearchFolders.isEmpty {
+                        searchSectionTitle("ПАПКИ", count: matchingSearchFolders.count)
+                        ForEach(matchingSearchFolders, id: \.standardizedFileURL.path) { folder in
+                            Button {
+                                searchText = ""
+                                openFolder(folder)
+                            } label: {
+                                HStack(spacing: 9) {
+                                    Image(systemName: "folder.fill")
+                                        .foregroundStyle(Color.white.opacity(0.7))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(folder.lastPathComponent)
+                                            .foregroundStyle(Color.white.opacity(0.92))
+                                        Text(folder.deletingLastPathComponent().lastPathComponent)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Color.white.opacity(0.45))
+                                    }
+                                    Spacer()
+                                    Image(systemName: "arrow.up.left")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Color.white.opacity(0.35))
+                                }
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 7)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if !matchingSearchArtists.isEmpty {
+                        searchSectionTitle("ИСПОЛНИТЕЛИ", count: matchingSearchArtists.count)
+                        ForEach(matchingSearchArtists) { artist in
+                            Button {
+                                libraryMode = 1
+                                selectedArtist = artist
+                                searchText = ""
+                            } label: {
+                                HStack(spacing: 9) {
+                                    Image(systemName: "person.fill")
+                                        .foregroundStyle(Color.white.opacity(0.7))
+                                    Text(artist.name)
+                                        .foregroundStyle(Color.white.opacity(0.92))
+                                    Spacer()
+                                    Text("\(artist.tracks.count) тр.")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                }
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 7)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if !matchingSearchTracks.isEmpty {
+                        searchSectionTitle("ТРЕКИ", count: matchingSearchTracks.count)
+                        ForEach(matchingSearchTracks) { track in
+                            TrackRow(
+                                url: track.url,
+                                isCurrent: audio.currentTrack?.url == track.url,
+                                onPlay: {
+                                    audio.setPlaylist(matchingSearchTracks)
+                                    audio.play(track)
+                                    onClose()
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            .padding(12)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func searchSectionTitle(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.72))
+            Spacer()
+            Text("\(count)")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.45))
+        }
+        .padding(.top, 3)
+    }
+
+    private func loadSearchIndexIfNeeded() {
+        guard let root = selectedRoot else { return }
+        guard searchIndexRootPath != root.path, !isSearchIndexLoading else { return }
+
+        searchIndexRootPath = root.path
+        isSearchIndexLoading = true
+
+        Task {
+            let index = await Task.detached(priority: .userInitiated) {
+                Self.scanSearchIndex(in: root)
+            }.value
+
+            let tracks = await AudioTrack.loadAll(from: index.audioFiles)
+
+            guard selectedRoot?.path == root.path else {
+                isSearchIndexLoading = false
+                searchIndexRootPath = nil
+                if !normalizedSearchQuery.isEmpty {
+                    loadSearchIndexIfNeeded()
+                }
+                return
+            }
+
+            searchFolders = index.folders
+            searchTracks = tracks
+            isSearchIndexLoading = false
+        }
+    }
+
+    private struct SearchIndexURLs {
+        let folders: [URL]
+        let audioFiles: [URL]
+    }
+
+    private nonisolated static func scanSearchIndex(in root: URL) -> SearchIndexURLs {
+        let fm = FileManager.default
+        let audioExtensions: Set<String> = [
+            "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "opus"
+        ]
+        var folders: [URL] = []
+        var audioFiles: [URL] = []
+
+        func walk(_ directory: URL) {
+            guard let items = try? fm.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else { return }
+
+            for item in items {
+                let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
+                if values?.isDirectory == true {
+                    folders.append(item)
+                    walk(item)
+                } else if values?.isRegularFile == true,
+                          audioExtensions.contains(item.pathExtension.lowercased()) {
+                    audioFiles.append(item)
+                }
+            }
+        }
+
+        walk(root)
+        folders.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        audioFiles.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        return SearchIndexURLs(folders: folders, audioFiles: audioFiles)
     }
 
     // MARK: - Folder Content
