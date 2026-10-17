@@ -538,7 +538,8 @@ struct LibraryView: View {
                     )
                     .font(
                         .system(
-                            size: 10,                            weight: .medium,
+                            size: 10,
+                            weight: .medium,
                             design: .monospaced
                         )
                     )
@@ -1244,7 +1245,8 @@ struct LibraryView: View {
             let index = await LibraryIndexStore.shared.load(root: root)
             guard selectedRoot?.standardizedFileURL.path == index.rootPath else {
                 isLoading = false
-                return            }
+                return
+            }
             artists = Self.makeArtistGroups(from: index.tracks)
             isLoading = false
         }
@@ -1493,7 +1495,8 @@ struct LibraryView: View {
 
         UserDefaults.standard.set(
             url.path,
-            forKey: rootDefaultsKey        )
+            forKey: rootDefaultsKey
+        )
 
         currentFolder = url
         selectedArtist = nil
@@ -1991,7 +1994,8 @@ private struct ArtistTile: View {
             .system(
                 size: 38,
                 weight: .regular
-            )        )
+            )
+        )
         .foregroundStyle(
             Color.white.opacity(0.18)
         )
@@ -2240,7 +2244,8 @@ private struct FolderTitleScroller: View {
                         .offset(
                             x:
                                 8
-                                + offset                        )
+                                + offset
+                        )
 
                     Spacer(
                         minLength: 0
