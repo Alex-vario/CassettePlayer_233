@@ -22,7 +22,7 @@ struct AudioTrack: Identifiable, Hashable {
             return ["Неизвестный исполнитель"]
         }
 
-        let separatorPattern = #"(?i)\b(?:featuring|feat\.?|ft\.?)(?=\s|$)|\s+&\s+"#
+        let separatorPattern = #"(?i)\b(?:featuring|feat\.?|ft\.?)(?=\s|$)|\s*/\s*|\s+&\s+"#
         let expression = try? NSRegularExpression(pattern: separatorPattern)
         let fullRange = NSRange(raw.startIndex..<raw.endIndex, in: raw)
         let hasNamedSeparator = expression?.firstMatch(in: raw, range: fullRange) != nil
