@@ -217,6 +217,7 @@ struct LibraryView: View {
     @State private var libraryMode = 0
     @State private var artists: [ArtistGroup] = []
     @State private var selectedArtist: ArtistGroup?
+    @State private var artistFilterText = ""
 
     @State private var searchText = ""
     @State private var searchFolders: [URL] = []
@@ -924,12 +925,77 @@ struct LibraryView: View {
 
                 } else {
 
-                    artistGrid
+                    artistFilterBar
+
+                    if filteredArtists.isEmpty {
+                        Text(
+                            artistFilterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? "В библиотеке пока нет исполнителей"
+                                : "Исполнители не найдены"
+                        )
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.52))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 24)
+                    } else {
+                        artistGrid
+                    }
                 }
             }
             .padding(12)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var normalizedArtistFilter: String {
+        artistFilterText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var filteredArtists: [ArtistGroup] {
+        guard !normalizedArtistFilter.isEmpty else {
+            return artists
+        }
+
+        return artists.filter {
+            $0.name.localizedCaseInsensitiveContains(normalizedArtistFilter)
+        }
+    }
+
+    private var artistFilterBar: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.52))
+
+            TextField("Фильтр исполнителей…", text: $artistFilterText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundStyle(Color.white.opacity(0.92))
+                .disableAutocorrection(true)
+
+            if !artistFilterText.isEmpty {
+                Button {
+                    artistFilterText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .help("Очистить фильтр исполнителей")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(width: 280, height: 30, alignment: .leading)
+        .background(
+            Color.white.opacity(0.07),
+            in: RoundedRectangle(cornerRadius: 7)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .help("Фильтрует только список исполнителей")
     }
 
     private var artistGrid: some View {
@@ -948,7 +1014,7 @@ struct LibraryView: View {
         ) {
 
             ForEach(
-                Array(artists.enumerated()),
+                Array(filteredArtists.enumerated()),
                 id: \.element.id
             ) { index, artist in
 
