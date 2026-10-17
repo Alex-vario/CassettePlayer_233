@@ -15,6 +15,63 @@ struct AudioTrack: Identifiable, Hashable {
     var bitrate: Int
     var artwork: Data?
 
+    /// Artist names used only for catalog grouping. Original metadata remains untouched.
+    var catalogueArtists: [String] {
+        let raw = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else {
+            return ["Неизвестный исполнитель"]
+        }
+
+        let separatorPattern = #"(?i)\b(?:featuring|feat\.?|ft\.?)\b|\s+&\s+"#
+        let expression = try? NSRegularExpression(pattern: separatorPattern)
+        let fullRange = NSRange(raw.startIndex..<raw.endIndex, in: raw)
+        let hasNamedSeparator = expression?.firstMatch(in: raw, range: fullRange) != nil
+        let separated = expression?.stringByReplacingMatches(
+            in: raw,
+            range: fullRange,
+            withTemplate: "|"
+        ) ?? raw
+
+        var parts = separated
+            .components(separatedBy: "|")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        // Split commas only when they produce exactly two non-empty names.
+        if !hasNamedSeparator, parts.count == 1 {
+            let commaParts = raw
+                .components(separatedBy: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if commaParts.count == 2 {
+                parts = commaParts
+            }
+        }
+
+        // Handle compact full-name collaborations such as "Вася Обломов&Андрей Макаревич",
+        // but leave one-word band names such as "Simon&Garfunkel" intact.
+        parts = parts.flatMap { part -> [String] in
+            let ampersandParts = part
+                .components(separatedBy: "&")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            guard ampersandParts.count > 1,
+                  ampersandParts.allSatisfy({ $0.split(whereSeparator: \.isWhitespace).count >= 2 }) else {
+                return [part]
+            }
+            return ampersandParts.filter { !$0.isEmpty }
+        }
+
+        var seen = Set<String>()
+        let unique = parts.filter { name in
+            let key = name.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+            return seen.insert(key).inserted
+        }
+        return unique.isEmpty ? ["Неизвестный исполнитель"] : unique
+    }
+
     init(url: URL) {
         self.url = url
         self.artist = ""
