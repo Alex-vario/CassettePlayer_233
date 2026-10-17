@@ -2,6 +2,188 @@ import SwiftUI
 import AppKit
 import AVFoundation
 
+// MARK: - Persistent Library Index
+
+/// The disk cache stores metadata, not copies of the audio files.
+/// It is always written to the same path and atomically replaced.
+private struct CachedLibraryTrack: Codable {
+    let path: String
+    let artist: String
+    let album: String
+    let bitrate: Int
+    let artwork: Data?
+
+    init(track: AudioTrack) {
+        path = track.url.path
+        artist = track.artist
+        album = track.album
+        bitrate = track.bitrate
+        artwork = track.artwork
+    }
+
+    func makeTrack() -> AudioTrack {
+        var track = AudioTrack(url: URL(fileURLWithPath: path))
+        track.artist = artist
+        track.album = album
+        track.bitrate = bitrate
+        track.artwork = artwork
+        return track
+    }
+}
+
+private struct CachedLibraryIndex: Codable {
+    let version: Int
+    let rootPath: String
+    let folderPaths: [String]
+    let tracks: [CachedLibraryTrack]
+
+    var snapshot: LibraryIndexSnapshot {
+        LibraryIndexSnapshot(
+            rootPath: rootPath,
+            folders: folderPaths.map { URL(fileURLWithPath: $0) },
+            tracks: tracks.map { $0.makeTrack() }
+        )
+    }
+
+    init(root: URL, folders: [URL], tracks: [AudioTrack]) {
+        version = 1
+        rootPath = root.standardizedFileURL.path
+        folderPaths = folders.map { $0.path }
+        self.tracks = tracks.map(CachedLibraryTrack.init(track:))
+    }
+}
+
+private struct LibraryIndexSnapshot {
+    let rootPath: String
+    let folders: [URL]
+    let tracks: [AudioTrack]
+
+    var rootFiles: [URL] {
+        tracks.map(\.url).filter {
+            $0.deletingLastPathComponent().standardizedFileURL.path == rootPath
+        }
+    }
+}
+
+/// One shared actor prevents search and the Artists view from starting
+/// separate scans. The cache is a single JSON file in Application Support.
+private actor LibraryIndexStore {
+    static let shared = LibraryIndexStore()
+
+    private var cachedIndex: CachedLibraryIndex?
+    private var buildTask: Task<CachedLibraryIndex, Never>?
+    private var buildRootPath: String?
+    private var buildGeneration = UUID()
+
+    private var cacheURL: URL {
+        let support = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        )[0]
+        return support
+            .appendingPathComponent("CassettePlayer", isDirectory: true)
+            .appendingPathComponent("LibraryIndex.json", isDirectory: false)
+    }
+
+    func load(root: URL, forceRefresh: Bool = false) async -> LibraryIndexSnapshot {
+        let rootPath = root.standardizedFileURL.path
+
+        if !forceRefresh, let cachedIndex, cachedIndex.rootPath == rootPath {
+            return cachedIndex.snapshot
+        }
+
+        if !forceRefresh,
+           let data = try? Data(contentsOf: cacheURL),
+           let diskIndex = try? JSONDecoder().decode(CachedLibraryIndex.self, from: data),
+           diskIndex.version == 1,
+           diskIndex.rootPath == rootPath {
+            cachedIndex = diskIndex
+            return diskIndex.snapshot
+        }
+
+        if !forceRefresh,
+           buildRootPath == rootPath,
+           let buildTask {
+            let result = await buildTask.value
+            if result.rootPath == rootPath {
+                cachedIndex = result
+                persist(result)
+            }
+            return result.snapshot
+        }
+
+        // A manual refresh supersedes an in-progress build. Only the newest
+        // generation is allowed to replace the on-disk index.
+        buildGeneration = UUID()
+        let generation = buildGeneration
+        buildRootPath = rootPath
+        let task = Task.detached(priority: .userInitiated) {
+            await Self.build(root: root)
+        }
+        buildTask = task
+
+        let result = await task.value
+        if generation == buildGeneration {
+            cachedIndex = result
+            persist(result)
+            buildTask = nil
+            buildRootPath = nil
+        }
+        return result.snapshot
+    }
+
+    private func persist(_ index: CachedLibraryIndex) {
+        let destination = cacheURL
+        do {
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let data = try JSONEncoder().encode(index)
+            // .atomic writes a temporary file and replaces the same cache file.
+            try data.write(to: destination, options: .atomic)
+        } catch {
+            // The in-memory index remains usable if disk caching fails.
+            NSLog("CassettePlayer: unable to save library index: %@", error.localizedDescription)
+        }
+    }
+
+    private nonisolated static func build(root: URL) async -> CachedLibraryIndex {
+        let fm = FileManager.default
+        let audioExtensions: Set<String> = [
+            "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "opus"
+        ]
+        var folders: [URL] = []
+        var audioURLs: [URL] = []
+
+        func walk(_ directory: URL) {
+            guard let items = try? fm.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else { return }
+
+            for item in items {
+                let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
+                if values?.isDirectory == true {
+                    folders.append(item)
+                    walk(item)
+                } else if values?.isRegularFile == true,
+                          audioExtensions.contains(item.pathExtension.lowercased()) {
+                    audioURLs.append(item)
+                }
+            }
+        }
+
+        walk(root)
+        folders.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        audioURLs.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        let tracks = await AudioTrack.loadAll(from: audioURLs)
+        return CachedLibraryIndex(root: root, folders: folders, tracks: tracks)
+    }
+}
+
+
 struct LibraryView: View {
 
     @ObservedObject var audio: AudioPlayer
@@ -172,6 +354,18 @@ struct LibraryView: View {
             .frame(width: 100)
             .help("Размер плиток")
             .accessibilityLabel("Размер плиток библиотеки")
+
+            Button {
+                refreshLibraryIndex()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.82))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Обновить библиотеку: пересканировать и заменить индекс")
 
             Button {
                 chooseLibraryFolder()
@@ -616,17 +810,12 @@ struct LibraryView: View {
         guard let root = selectedRoot else { return }
         guard searchIndexRootPath != root.path, !isSearchIndexLoading else { return }
 
-        searchIndexRootPath = root.path
         isSearchIndexLoading = true
 
         Task {
-            let index = await Task.detached(priority: .userInitiated) {
-                Self.scanSearchIndex(in: root)
-            }.value
+            let index = await LibraryIndexStore.shared.load(root: root)
 
-            let tracks = await AudioTrack.loadAll(from: index.audioFiles)
-
-            guard selectedRoot?.path == root.path else {
+            guard selectedRoot?.standardizedFileURL.path == index.rootPath else {
                 isSearchIndexLoading = false
                 searchIndexRootPath = nil
                 if !normalizedSearchQuery.isEmpty {
@@ -635,48 +824,12 @@ struct LibraryView: View {
                 return
             }
 
+            searchIndexRootPath = index.rootPath
             searchFolders = index.folders
-            searchTracks = tracks
+            searchTracks = index.tracks
+            artists = Self.makeArtistGroups(from: index.tracks)
             isSearchIndexLoading = false
         }
-    }
-
-    private struct SearchIndexURLs {
-        let folders: [URL]
-        let audioFiles: [URL]
-    }
-
-    private nonisolated static func scanSearchIndex(in root: URL) -> SearchIndexURLs {
-        let fm = FileManager.default
-        let audioExtensions: Set<String> = [
-            "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "opus"
-        ]
-        var folders: [URL] = []
-        var audioFiles: [URL] = []
-
-        func walk(_ directory: URL) {
-            guard let items = try? fm.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            ) else { return }
-
-            for item in items {
-                let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
-                if values?.isDirectory == true {
-                    folders.append(item)
-                    walk(item)
-                } else if values?.isRegularFile == true,
-                          audioExtensions.contains(item.pathExtension.lowercased()) {
-                    audioFiles.append(item)
-                }
-            }
-        }
-
-        walk(root)
-        folders.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
-        audioFiles.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
-        return SearchIndexURLs(folders: folders, audioFiles: audioFiles)
     }
 
     // MARK: - Folder Content
@@ -1001,66 +1154,72 @@ struct LibraryView: View {
     // MARK: - Artist Loading
 
     private func loadArtists() {
-
         guard let root = selectedRoot else {
             artists = []
             return
         }
 
         isLoading = true
+        Task {
+            let index = await LibraryIndexStore.shared.load(root: root)
+            guard selectedRoot?.standardizedFileURL.path == index.rootPath else {
+                isLoading = false
+                return
+            }
+            artists = Self.makeArtistGroups(from: index.tracks)
+            isLoading = false
+        }
+    }
+
+    private nonisolated static func makeArtistGroups(from tracks: [AudioTrack]) -> [ArtistGroup] {
+        var grouped: [String: [AudioTrack]] = [:]
+        for track in tracks {
+            let artist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = artist.isEmpty ? "Неизвестный исполнитель" : artist
+            grouped[name, default: []].append(track)
+        }
+
+        return grouped.map { name, tracks in
+            ArtistGroup(
+                name: name,
+                tracks: tracks.sorted {
+                    $0.title.localizedStandardCompare($1.title) == .orderedAscending
+                }
+            )
+        }.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private func refreshLibraryIndex() {
+        guard let root = selectedRoot else {
+            chooseLibraryFolder()
+            return
+        }
+
+        isLoading = true
+        isSearchIndexLoading = !normalizedSearchQuery.isEmpty
 
         Task {
-
-            let tracks =
-                await Task.detached(
-                    priority: .userInitiated
-                ) {
-                    await Self.collectAudioTracksStatic(in: root)
-                }
-                .value
-
-            var grouped:
-                [String: [AudioTrack]] = [:]
-
-            for track in tracks {
-
-                let artist =
-                    track.artist
-                        .trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        )
-
-                let name =
-                    artist.isEmpty
-                        ? "Неизвестный исполнитель"
-                        : artist
-
-                grouped[name, default: []].append(
-                    track
-                )
+            let index = await LibraryIndexStore.shared.load(root: root, forceRefresh: true)
+            guard selectedRoot?.standardizedFileURL.path == index.rootPath else {
+                isLoading = false
+                isSearchIndexLoading = false
+                return
             }
 
-            artists =
-                grouped.map { name, tracks in
+            searchIndexRootPath = index.rootPath
+            searchFolders = index.folders
+            searchTracks = index.tracks
+            artists = Self.makeArtistGroups(from: index.tracks)
 
-                    ArtistGroup(
-                        name: name,
-                        tracks:
-                            tracks.sorted {
-                                $0.title.localizedStandardCompare(
-                                    $1.title
-                                ) == .orderedAscending
-                            }
-                    )
-                }
-                .sorted {
-
-                    $0.name.localizedCaseInsensitiveCompare(
-                        $1.name
-                    ) == .orderedAscending
-                }
+            let visibleFolder = currentFolder ?? root
+            let folderResult = Self.scanFolder(visibleFolder)
+            folders = folderResult.folders
+            rootFiles = folderResult.files
 
             isLoading = false
+            isSearchIndexLoading = false
         }
     }
 
@@ -1224,14 +1383,19 @@ struct LibraryView: View {
         selectedArtist = nil
 
         if libraryMode == 0 {
-
-            openFolder(
-                url
-            )
-
+            openFolder(url)
         } else {
-
             loadArtists()
+        }
+
+        // Build or load the single cache for the newly selected root.
+        Task {
+            let index = await LibraryIndexStore.shared.load(root: url)
+            guard selectedRoot?.standardizedFileURL.path == index.rootPath else { return }
+            searchIndexRootPath = index.rootPath
+            searchFolders = index.folders
+            searchTracks = index.tracks
+            artists = Self.makeArtistGroups(from: index.tracks)
         }
     }
 
@@ -1262,14 +1426,20 @@ struct LibraryView: View {
         selectedRoot = url
 
         if libraryMode == 0 {
-
-            openFolder(
-                url
-            )
-
+            openFolder(url)
         } else {
-
             loadArtists()
+        }
+
+        // Load the saved index immediately on startup; scan only if no
+        // compatible cache exists yet.
+        Task {
+            let index = await LibraryIndexStore.shared.load(root: url)
+            guard selectedRoot?.standardizedFileURL.path == index.rootPath else { return }
+            searchIndexRootPath = index.rootPath
+            searchFolders = index.folders
+            searchTracks = index.tracks
+            artists = Self.makeArtistGroups(from: index.tracks)
         }
     }
 
