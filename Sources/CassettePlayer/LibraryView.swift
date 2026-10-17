@@ -1190,15 +1190,21 @@ struct LibraryView: View {
 
     private nonisolated static func makeArtistGroups(from tracks: [AudioTrack]) -> [ArtistGroup] {
         var grouped: [String: [AudioTrack]] = [:]
+        var displayNames: [String: String] = [:]
+
         for track in tracks {
-            let artist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-            let name = artist.isEmpty ? "Неизвестный исполнитель" : artist
-            grouped[name, default: []].append(track)
+            for rawName in track.catalogueArtists {
+                let (key, displayName) = normalizedCatalogueArtist(rawName)
+                if !(grouped[key] ?? []).contains(where: { $0.url == track.url }) {
+                    grouped[key, default: []].append(track)
+                }
+                displayNames[key] = displayName
+            }
         }
 
-        return grouped.map { name, tracks in
+        return grouped.map { key, tracks in
             ArtistGroup(
-                name: name,
+                name: displayNames[key] ?? key,
                 tracks: tracks.sorted {
                     $0.title.localizedStandardCompare($1.title) == .orderedAscending
                 }
@@ -1206,6 +1212,38 @@ struct LibraryView: View {
         }.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
+    }
+
+    /// Canonicalizes known catalogue variants without correcting arbitrary typos.
+    /// Trailing release notes in brackets/parentheses affect grouping only, not metadata.
+    private nonisolated static func normalizedCatalogueArtist(_ rawName: String) -> (key: String, displayName: String) {
+        var name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let suffixPatterns = [#"\s*\[[^\]]*\]\s*$"#, #"\s*\([^\)]*\)\s*$"#]
+
+        for pattern in suffixPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern) {
+                let range = NSRange(name.startIndex..<name.endIndex, in: name)
+                name = regex.stringByReplacingMatches(in: name, range: range, withTemplate: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        let folded = name.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        ).lowercased()
+        let aliases: [String: String] = [
+            "anathema": "Anathema",
+            "ananthema": "Anathema",
+            "ananthema сборник": "Anathema",
+            "anathema сборник": "Anathema"
+        ]
+        let displayName = aliases[folded] ?? name
+        let canonicalKey = displayName.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        ).lowercased()
+        return (canonicalKey, displayName.isEmpty ? rawName : displayName)
     }
 
     private func refreshLibraryIndex() {
