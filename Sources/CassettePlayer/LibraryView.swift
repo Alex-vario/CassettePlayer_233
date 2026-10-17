@@ -526,7 +526,7 @@ struct LibraryView: View {
                         ForEach(matchingSearchFolders, id: \.standardizedFileURL.path) { folder in
                             Button {
                                 searchText = ""
-                                openFolder(folder)
+                                playFolder(folder)
                             } label: {
                                 HStack(spacing: 9) {
                                     Image(systemName: "folder.fill")
@@ -556,9 +556,8 @@ struct LibraryView: View {
                         searchSectionTitle("ИСПОЛНИТЕЛИ", count: matchingSearchArtists.count)
                         ForEach(matchingSearchArtists) { artist in
                             Button {
-                                libraryMode = 1
-                                selectedArtist = artist
                                 searchText = ""
+                                playArtist(artist)
                             } label: {
                                 HStack(spacing: 9) {
                                     Image(systemName: "person.fill")
