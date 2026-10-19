@@ -1012,7 +1012,9 @@ struct LibraryView: View {
             searchIndexRootPath = index.rootPath
             searchFolders = index.folders
             searchTracks = index.tracks
-            artists = Self.makeArtistGroups(from: index.tracks)
+            artists = await Task.detached(priority: .utility) {
+                Self.makeArtistGroups(from: index.tracks)
+            }.value
             isSearchIndexLoading = false
         }
     }
@@ -1373,7 +1375,9 @@ struct LibraryView: View {
                 isLoading = false
                 return
             }
-            artists = Self.makeArtistGroups(from: index.tracks)
+            artists = await Task.detached(priority: .utility) {
+                Self.makeArtistGroups(from: index.tracks)
+            }.value
             isLoading = false
         }
     }
@@ -1684,7 +1688,9 @@ struct LibraryView: View {
             searchIndexRootPath = index.rootPath
             searchFolders = index.folders
             searchTracks = index.tracks
-            artists = Self.makeArtistGroups(from: index.tracks)
+            artists = await Task.detached(priority: .utility) {
+                Self.makeArtistGroups(from: index.tracks)
+            }.value
         }
     }
 
