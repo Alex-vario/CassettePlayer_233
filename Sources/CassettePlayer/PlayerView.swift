@@ -1495,25 +1495,6 @@ private struct CassetteButtonPlaceholder: View {
 
     @ObservedObject var audio: AudioPlayer
 
-    private static let cassetteImages: [String: NSImage] =
-        Dictionary(
-            uniqueKeysWithValues: [
-                "cassette",
-                "cassette_02",
-                "cassette_03",
-                "cassette_04",
-                "cassette_05",
-                "cassette_06",
-                "cassette_07"
-            ].compactMap { name in
-                guard let image = loadCassetteImage(name) else {
-                    return nil
-                }
-
-                return (name, image)
-            }
-        )
-
     var body: some View {
 
         ZStack {
