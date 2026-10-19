@@ -240,7 +240,13 @@ struct LibraryView: View {
 
         ZStack(alignment: .top) {
 
-            PanelMaterials.mainPanel
+            if compactHeader {
+                // In MAX mode, let the blurred artwork background show through
+                // instead of painting the library with an opaque metal gradient.
+                Color.black.opacity(0.30)
+            } else {
+                PanelMaterials.mainPanel
+            }
 
             if isContentVisible {
                 VStack(spacing: 0) {
