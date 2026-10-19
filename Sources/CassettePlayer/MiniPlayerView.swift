@@ -4,6 +4,7 @@ import AppKit
 struct MiniPlayerView: View {
 
     @ObservedObject var audio: AudioPlayer
+    @ObservedObject var levelMeter: AudioLevelMeter
     @Binding var alwaysOnTop: Bool
     let onReturnToMain: () -> Void
 
@@ -14,16 +15,22 @@ struct MiniPlayerView: View {
     )
 
     private let panelWidth: CGFloat = 520
-    private let panelHeight: CGFloat = 104
+    private let panelHeight: CGFloat = 54
 
-    private var trackTitle: String {
+    private var artistName: String {
         guard let track = audio.currentTrack else {
             return "NO TRACK LOADED"
         }
+        let artist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        return artist.isEmpty ? "UNKNOWN ARTIST" : artist
+    }
 
-        return track.artist.isEmpty
-            ? track.title
-            : "\(track.artist) — \(track.title)"
+    private var trackTitle: String {
+        guard let track = audio.currentTrack else {
+            return ""
+        }
+        let title = track.taggedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? track.title : title
     }
 
     var body: some View {
@@ -49,17 +56,17 @@ struct MiniPlayerView: View {
                 .stroke(Color.black.opacity(0.9), lineWidth: 1)
                 .padding(3)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 compactMeters
-                    .frame(width: 92)
+                    .frame(width: 82)
 
                 verticalDivider
 
-                MiniScrollingTrackTitle(
-                    name: trackTitle,
-                    green: green
-                )
-                .frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 2) {
+                    MiniScrollingTextLine(name: artistName, green: green, fontSize: 10)
+                    MiniScrollingTextLine(name: trackTitle, green: green, fontSize: 11)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 verticalDivider
 
@@ -68,99 +75,88 @@ struct MiniPlayerView: View {
                 verticalDivider
 
                 Button(action: onReturnToMain) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(green)
-                        .frame(width: 30, height: 42)
-                        .background(Color.black.opacity(0.42))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 3)
-                                .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                        }
+                    Color.clear
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(
+                    TransportButtonStyle(
+                        title: "↩",
+                        isActive: false,
+                        momentary: true,
+                        buttonWidth: 34,
+                        buttonHeight: 33
+                    )
+                )
                 .help("Return to the main player")
 
                 alwaysOnTopControl
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
         }
         .frame(width: panelWidth, height: panelHeight)
         .clipped()
     }
 
     private var compactMeters: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
                 Text("L")
                     .foregroundStyle(green)
                     .frame(width: 9, alignment: .leading)
-
-                MiniMeterBar(level: audio.levelMeter.leftLevel, green: green)
+                MiniMeterBar(level: levelMeter.leftLevel, green: green)
             }
 
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Text("R")
-                    .foregroundStyle(Color(red: 0.92, green: 0.24, blue: 0.035))
+                    .foregroundStyle(green)
                     .frame(width: 9, alignment: .leading)
-
-                MiniMeterBar(
-                    level: audio.levelMeter.rightLevel,
-                    green: green
-                )
+                MiniMeterBar(level: levelMeter.rightLevel, green: green)
             }
         }
         .font(.system(size: 9, weight: .bold, design: .monospaced))
-        .padding(.trailing, 2)
+        .padding(.trailing, 1)
     }
 
     private var transportControls: some View {
-        HStack(spacing: 4) {
-            transportButton(
-                symbol: "backward.end.fill",
-                help: "Previous track",
-                action: audio.previous
-            )
+        HStack(spacing: 2) {
+            miniTransportButton("◀◀", help: "Previous track", action: audio.previous)
 
-            transportButton(
-                symbol: audio.isPlaying ? "pause.fill" : "play.fill",
+            miniTransportButton(
+                audio.isPlaying ? "Ⅱ" : "▶",
                 help: audio.isPlaying ? "Pause" : "Play",
                 action: audio.togglePlayPause
             )
-            .frame(width: 36, height: 42)
-
-            transportButton(
-                symbol: "forward.end.fill",
-                help: "Next track",
-                action: audio.next
+            .buttonStyle(
+                TransportButtonStyle(
+                    title: audio.isPlaying ? "Ⅱ" : "▶",
+                    isActive: audio.isPlaying,
+                    momentary: false,
+                    buttonWidth: 34,
+                    buttonHeight: 33
+                )
             )
+
+            miniTransportButton("▶▶", help: "Next track", action: audio.next)
         }
     }
 
-    private func transportButton(
-        symbol: String,
+    private func miniTransportButton(
+        _ title: String,
         help: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(green.opacity(0.95))
-                .frame(width: 32, height: 42)
-                .background(
-                    LinearGradient(
-                        colors: [Color(white: 0.17), Color(white: 0.075)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                }
+            Color.clear
         }
-        .buttonStyle(.plain)
+        .buttonStyle(
+            TransportButtonStyle(
+                title: title,
+                isActive: false,
+                momentary: true,
+                buttonWidth: 34,
+                buttonHeight: 33
+            )
+        )
         .help(help)
     }
 
@@ -168,7 +164,7 @@ struct MiniPlayerView: View {
         Button {
             alwaysOnTop.toggle()
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 Text("TOP")
                     .font(.system(size: 7, weight: .bold, design: .monospaced))
                     .foregroundStyle(
@@ -176,34 +172,31 @@ struct MiniPlayerView: View {
                     )
 
                 ZStack {
-                    Capsule()
+                    Rectangle()
                         .fill(Color.black.opacity(0.75))
-                        .frame(width: 18, height: 42)
+                        .frame(width: 14, height: 29)
                         .overlay {
-                            Capsule()
+                            Rectangle()
                                 .stroke(Color.white.opacity(0.16), lineWidth: 1)
                         }
 
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [
-                                    Color(white: 0.78),
-                                    Color(white: 0.35)
-                                ],
+                                colors: [Color(white: 0.78), Color(white: 0.35)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 12, height: 12)
+                        .frame(width: 10, height: 10)
                         .overlay {
                             Circle()
                                 .stroke(Color.black.opacity(0.7), lineWidth: 1)
                         }
-                        .offset(y: alwaysOnTop ? -11 : 11)
+                        .offset(y: alwaysOnTop ? -7 : 7)
                 }
             }
-            .frame(width: 26, height: 58)
+            .frame(width: 22, height: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -215,7 +208,7 @@ struct MiniPlayerView: View {
     private var verticalDivider: some View {
         Rectangle()
             .fill(Color.white.opacity(0.10))
-            .frame(width: 1, height: 54)
+            .frame(width: 1, height: 38)
     }
 }
 
@@ -236,31 +229,31 @@ private struct MiniMeterBar: View {
                     ? Color(red: 0.92, green: 0.24, blue: 0.035)
                     : green
 
-                RoundedRectangle(cornerRadius: 1)
+                Rectangle()
                     .fill(color)
                     .opacity(isActive ? 0.95 : 0.13)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 10)
+                    .frame(height: 8)
             }
         }
-        .frame(height: 12)
-        .padding(.horizontal, 4)
+        .frame(height: 10)
+        .padding(.horizontal, 3)
         .background(Color.black.opacity(0.75))
         .overlay {
-            RoundedRectangle(cornerRadius: 2)
+            Rectangle()
                 .stroke(Color.black.opacity(0.95), lineWidth: 1)
         }
     }
 }
 
-private struct MiniScrollingTrackTitle: View {
+private struct MiniScrollingTextLine: View {
 
     let name: String
     let green: Color
+    let fontSize: CGFloat
 
     @State private var offset: CGFloat = 0
 
-    private let fontSize: CGFloat = 11
     private let scrollSpeed: CGFloat = 32
     private let initialPause: Double = 1.1
     private let endPause: Double = 1.2
@@ -268,30 +261,19 @@ private struct MiniScrollingTrackTitle: View {
     private var textWidth: CGFloat {
         (name as NSString).size(
             withAttributes: [
-                .font: NSFont.monospacedSystemFont(
-                    ofSize: fontSize,
-                    weight: .medium
-                )
+                .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
             ]
         ).width
     }
 
-    private var travel: CGFloat {
-        max(0, textWidth - 190)
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text("NOW PLAYING")
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color.white.opacity(0.42))
-
+        GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 Text(name)
                     .font(.system(size: fontSize, weight: .medium, design: .monospaced))
                     .foregroundStyle(green.opacity(0.22))
                     .fixedSize()
-                    .blur(radius: 3)
+                    .blur(radius: 2)
                     .offset(x: -offset)
 
                 Text(name)
@@ -301,41 +283,39 @@ private struct MiniScrollingTrackTitle: View {
                     .offset(x: -offset)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 17)
+            .frame(height: fontSize + 3)
             .clipped()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: name) {
-            offset = 0
-            guard travel > 0 else { return }
-
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(
-                        nanoseconds: UInt64(initialPause * 1_000_000_000)
-                    )
-                } catch {
-                    return
-                }
-
-                guard !Task.isCancelled else { return }
-
-                let duration = Double(travel / scrollSpeed)
-                withAnimation(.linear(duration: duration)) {
-                    offset = travel
-                }
-
-                do {
-                    try await Task.sleep(
-                        nanoseconds: UInt64((duration + endPause) * 1_000_000_000)
-                    )
-                } catch {
-                    return
-                }
-
-                guard !Task.isCancelled else { return }
+            .task(id: name + String(fontSize)) {
                 offset = 0
+                let travel = max(0, textWidth - geometry.size.width)
+                guard travel > 0 else { return }
+
+                while !Task.isCancelled {
+                    do {
+                        try await Task.sleep(nanoseconds: UInt64(initialPause * 1_000_000_000))
+                    } catch {
+                        return
+                    }
+                    guard !Task.isCancelled else { return }
+
+                    let duration = Double(travel / scrollSpeed)
+                    withAnimation(.linear(duration: duration)) {
+                        offset = travel
+                    }
+
+                    do {
+                        try await Task.sleep(
+                            nanoseconds: UInt64((duration + endPause) * 1_000_000_000)
+                        )
+                    } catch {
+                        return
+                    }
+                    guard !Task.isCancelled else { return }
+                    offset = 0
+                }
             }
         }
+        .frame(height: fontSize + 3)
+        .frame(maxWidth: .infinity)
     }
 }
