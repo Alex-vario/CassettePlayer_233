@@ -189,7 +189,11 @@ final class WindowGeometryManager: ObservableObject {
     }
 
     private func saveCurrentFrame() {
-        guard let window else { return }
+        guard let window,
+              !window.styleMask.contains(.fullScreen) else {
+            // Fullscreen dimensions must never overwrite the saved normal-window frame.
+            return
+        }
 
         let key: String
         switch mode {
