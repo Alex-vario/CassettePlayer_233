@@ -101,7 +101,7 @@ struct MiniPlayerView: View {
 
             RoundedRectangle(cornerRadius: 2)
                 .fill(
-                    Color(red: 0.008, green: 0.045, blue: 0.028)
+                    Color(red: 0.003, green: 0.018, blue: 0.011)
                 )
                 .overlay {
                     LinearGradient(
@@ -135,8 +135,8 @@ struct MiniPlayerView: View {
             // and a little more translucency without obscuring the readout.
             RoundedRectangle(cornerRadius: 2)
                 .fill(
-                    Color(red: 0.025, green: 0.045, blue: 0.035)
-                        .opacity(0.27)
+                    Color(red: 0.006, green: 0.014, blue: 0.009)
+                        .opacity(0.62)
                 )
                 .background {
                     RoundedRectangle(cornerRadius: 2)
@@ -148,9 +148,9 @@ struct MiniPlayerView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.075),
-                                    Color.white.opacity(0.018),
-                                    Color.black.opacity(0.10)
+                                    Color.white.opacity(0.028),
+                                    Color.white.opacity(0.008),
+                                    Color.black.opacity(0.24)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -159,7 +159,7 @@ struct MiniPlayerView: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 2)
-                        .stroke(Color.white.opacity(0.075), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.045), lineWidth: 1)
                 }
                 .blur(radius: 0.65)
                 .allowsHitTesting(false)
