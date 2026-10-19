@@ -80,6 +80,7 @@ struct MaxPlayerView: View {
     @State private var coverImage: NSImage?
     @State private var blurredBackgroundImage: NSImage?
     @State private var artworkGeneration = 0
+    @State private var displayedArtworkGeneration = 0
     @State private var artworkTask: Task<Void, Never>?
     @State private var artworkProcessingTask: Task<(original: CGImage?, blurred: CGImage?), Never>?
 
@@ -153,7 +154,7 @@ struct MaxPlayerView: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size.width, height: size.height)
                     .scaleEffect(1.18)
-                    .id(audio.currentTrack?.id)
+                    .id(displayedArtworkGeneration)
                     .transition(.opacity)
             }
 
@@ -180,7 +181,7 @@ struct MaxPlayerView: View {
         }
         .frame(width: size.width, height: size.height)
         .clipped()
-        .animation(.easeInOut(duration: 0.85), value: audio.currentTrack?.id)
+        .animation(.easeInOut(duration: 0.95), value: displayedArtworkGeneration)
     }
 
     private func prepareArtwork() {
@@ -190,9 +191,10 @@ struct MaxPlayerView: View {
         artworkProcessingTask?.cancel()
 
         guard let artworkData = audio.currentTrack?.artwork else {
-            withAnimation(.easeInOut(duration: 0.65)) {
+            withAnimation(.easeInOut(duration: 0.95)) {
                 coverImage = nil
                 blurredBackgroundImage = nil
+                displayedArtworkGeneration = generation
             }
             return
         }
@@ -216,16 +218,17 @@ struct MaxPlayerView: View {
                 NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height))
             }
 
-            withAnimation(.easeInOut(duration: 0.65)) {
+            withAnimation(.easeInOut(duration: 0.95)) {
                 coverImage = original
                 blurredBackgroundImage = blurred
+                displayedArtworkGeneration = generation
             }
         }
     }
 
     /// Decodes the crisp cover at its original resolution, but downsamples the
-    /// background copy before blurring it. A 1600 px maximum is ample for a
-    /// fullscreen backdrop and greatly reduces Core Image work and memory use.
+    /// background copy before blurring it. A 600 px maximum is sufficient for
+    /// the heavily blurred fullscreen backdrop and minimizes Core Image work.
     private nonisolated static func prepareArtworkImages(from data: Data) -> (original: CGImage?, blurred: CGImage?) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return (nil, nil)
@@ -245,7 +248,7 @@ struct MaxPlayerView: View {
 
         let thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 1600,
+            kCGImageSourceThumbnailMaxPixelSize: 600,
             kCGImageSourceShouldCache: true,
             kCGImageSourceShouldCacheImmediately: true
         ]
@@ -286,7 +289,7 @@ struct MaxPlayerView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: coverSide, height: coverSide)
                         .accessibilityLabel("Обложка текущего альбома")
-                        .id(audio.currentTrack?.id)
+                        .id(displayedArtworkGeneration)
                         .transition(.opacity)
                 } else {
                     VStack(spacing: 12) {
