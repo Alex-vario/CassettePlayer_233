@@ -284,7 +284,7 @@ private struct MiniScrollingTextLine: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: fontSize + 3)
             .clipped()
-            .task(id: name + String(fontSize)) {
+            .task(id: name + String(describing: fontSize)) {
                 offset = 0
                 let travel = max(0, textWidth - geometry.size.width)
                 guard travel > 0 else { return }
