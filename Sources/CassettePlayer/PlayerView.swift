@@ -78,8 +78,7 @@ struct PlayerView: View {
                     audio: audio,
                     levelMeter: audio.levelMeter,
                     alwaysOnTop: $alwaysOnTop,
-                    onReturnToMain: switchToMainPlayer,
-                    onDrop: handleDrop
+                    onReturnToMain: switchToMainPlayer
                 )
                 .frame(
                     width: miniPlayerWidth,
