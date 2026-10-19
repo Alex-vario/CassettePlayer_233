@@ -206,6 +206,7 @@ struct LibraryView: View {
     @ObservedObject var audio: AudioPlayer
 
     let onClose: () -> Void
+    var showsCloseButton: Bool = true
 
     @State private var currentFolder: URL?
     @State private var folders: [URL] = []
@@ -214,13 +215,15 @@ struct LibraryView: View {
     @State private var isLoading = false
     @State private var isContentVisible = false
 
-    @State private var libraryMode = 0
+    @AppStorage("CassettePlayer.Library.Mode")
+    private var libraryMode = 0
     @State private var artists: [ArtistGroup] = []
     @State private var selectedArtist: ArtistGroup?
 
     @AppStorage("CassettePlayer.Library.FilterMode")
     private var libraryFilterMode = "folder"
-    @State private var libraryFilterText = ""
+    @AppStorage("CassettePlayer.Library.FilterText")
+    private var libraryFilterText = ""
     @State private var searchFolders: [URL] = []
     @State private var searchTracks: [AudioTrack] = []
     @State private var isSearchIndexLoading = false
@@ -415,24 +418,26 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             .padding(.trailing, 8)
 
-            Button {
-                onClose()
-            } label: {
+            if showsCloseButton {
+                Button {
+                    onClose()
+                } label: {
 
-                Text("▲")
-                    .font(
-                        .system(
-                            size: 15,
-                            weight: .medium,
-                            design: .monospaced
+                    Text("▲")
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .medium,
+                                design: .monospaced
+                            )
                         )
-                    )
-                    .foregroundStyle(
-                        Color.white.opacity(0.9)
-                    )
-                    .offset(y: -2)
+                        .foregroundStyle(
+                            Color.white.opacity(0.9)
+                        )
+                        .offset(y: -2)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
         .frame(height: 42)
