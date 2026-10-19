@@ -341,18 +341,11 @@ private struct MiniScrollingTextLine: View {
     let fontSize: CGFloat
 
     @State private var offset: CGFloat = 0
+    @State private var textWidth: CGFloat = 0
 
     private let scrollSpeed: CGFloat = 32
     private let initialPause: Double = 1.1
     private let endPause: Double = 1.2
-
-    private var textWidth: CGFloat {
-        (name as NSString).size(
-            withAttributes: [
-                .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
-            ]
-        ).width
-    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -369,12 +362,23 @@ private struct MiniScrollingTextLine: View {
                     .foregroundStyle(green)
                     .shadow(color: green.opacity(0.78), radius: 4.5, x: 0, y: 0)
                     .fixedSize()
+                    .background {
+                        GeometryReader { textGeometry in
+                            Color.clear
+                                .onAppear {
+                                    textWidth = textGeometry.size.width
+                                }
+                                .onChange(of: textGeometry.size.width) { newValue in
+                                    textWidth = newValue
+                                }
+                        }
+                    }
                     .offset(x: -offset)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: fontSize + 3)
             .clipped()
-            .task(id: name + String(describing: fontSize)) {
+            .task(id: name + String(describing: fontSize) + String(describing: textWidth)) {
                 offset = 0
                 let travel = max(0, textWidth - geometry.size.width)
                 guard travel > 0 else { return }
