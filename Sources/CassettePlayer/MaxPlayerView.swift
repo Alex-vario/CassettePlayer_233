@@ -57,7 +57,9 @@ final class FullscreenModeController: ObservableObject {
     }
 
     private func removeObservers() {
-        observers.forEach(NotificationCenter.default.removeObserver)
+        for observer in observers {
+            NotificationCenter.default.removeObserver(observer)
+        }
         observers.removeAll()
     }
 
@@ -100,13 +102,16 @@ struct MaxPlayerView: View {
 
                 HStack(alignment: .top, spacing: gap) {
                     leftPanel(coverSide: coverSide)
-                        .frame(width: leftWidth, maxHeight: .infinity)
+                        .frame(width: leftWidth)
+                .frame(maxHeight: .infinity)
 
                     middlePanel(infoHeight: infoHeight)
-                        .frame(width: middleWidth, maxHeight: .infinity)
+                        .frame(width: middleWidth)
+                .frame(maxHeight: .infinity)
 
                     rightPanel
-                        .frame(width: rightWidth, maxHeight: .infinity)
+                        .frame(width: rightWidth)
+                .frame(maxHeight: .infinity)
                 }
                 .padding(.horizontal, sidePadding)
                 .padding(.vertical, sidePadding)
@@ -124,9 +129,6 @@ struct MaxPlayerView: View {
         }
         .onChange(of: audio.playlist) { _ in
             loadPlaylistDurations()
-        }
-        .onChange(of: audio.currentTrack) { _ in
-            scrollToCurrentTrack = true
         }
         .onExitCommand(perform: onExit)
     }
@@ -527,7 +529,6 @@ struct MaxPlayerView: View {
                 }
                 .scrollIndicators(.hidden)
                 .onAppear {
-                    scrollToCurrentTrack = true
                     if let id = audio.currentTrack?.id {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                             proxy.scrollTo(id, anchor: .center)
@@ -539,11 +540,6 @@ struct MaxPlayerView: View {
                     withAnimation(.easeInOut(duration: 0.22)) {
                         proxy.scrollTo(id, anchor: .center)
                     }
-                }
-                .onChange(of: scrollToCurrentTrack) { shouldScroll in
-                    guard shouldScroll, let id = audio.currentTrack?.id else { return }
-                    proxy.scrollTo(id, anchor: .center)
-                    scrollToCurrentTrack = false
                 }
             }
 
@@ -564,7 +560,6 @@ struct MaxPlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    @State private var scrollToCurrentTrack = false
 
     private func playlistRow(_ track: AudioTrack, index: Int) -> some View {
         let isCurrent = audio.currentTrack?.url == track.url
