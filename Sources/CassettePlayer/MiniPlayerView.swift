@@ -125,7 +125,10 @@ struct MiniPlayerView: View {
                     MiniScrollingTextLine(name: artistName, green: green, fontSize: 10)
                     MiniScrollingTextLine(name: trackTitle, green: green, fontSize: 11)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // Allow the text column to shrink to the space left beside the meters.
+                // Without minWidth: 0, long fixed-size text can widen the whole HStack.
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                .clipped()
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
