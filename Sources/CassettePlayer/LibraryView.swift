@@ -1810,6 +1810,7 @@ struct LibraryView: View {
             searchIndexRootPath = index.rootPath
             searchFolders = index.folders
             searchTracks = index.tracks
+            await loadFolderArtworkMap(from: index)
             artists = await Task.detached(priority: .utility) {
                 Self.makeArtistGroups(from: index.tracks)
             }.value
