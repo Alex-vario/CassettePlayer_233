@@ -643,7 +643,7 @@ struct MaxPlayerView: View {
     private func loadPlaylistDurations() {
         durationLoadGeneration += 1
         let generation = durationLoadGeneration
-        let tracks = audio.playlist
+        let urls = audio.playlist.map(\.url)
 
         Task {
             let result = await Task.detached(priority: .utility) {
@@ -652,14 +652,14 @@ struct MaxPlayerView: View {
                 var loaded: [URL: TimeInterval] = [:]
                 var total: TimeInterval = 0
 
-                for track in tracks {
+                for url in urls {
                     do {
-                        let file = try AVAudioFile(forReading: track.url)
+                        let file = try AVAudioFile(forReading: url)
                         let sampleRate = file.processingFormat.sampleRate
                         guard sampleRate > 0 else { continue }
 
                         let duration = Double(file.length) / sampleRate
-                        loaded[track.url] = duration
+                        loaded[url] = duration
                         total += duration
                     } catch {
                         continue
