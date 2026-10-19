@@ -74,7 +74,7 @@ final class WindowGeometryManager: ObservableObject {
             window.setFrame(savedFrame, display: true, animate: true)
         } else {
             let targetSize = toMini
-                ? NSSize(width: 520, height: 104)
+                ? NSSize(width: 520, height: 54)
                 : NSSize(width: 1024, height: 283)
 
             window.setContentSize(targetSize)
