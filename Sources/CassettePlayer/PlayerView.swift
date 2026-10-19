@@ -11,11 +11,19 @@ struct PlayerView: View {
     @State private var showPlaylist = false
     @State private var isPlaylistMounted = false
     @State private var showLibrary = false
+    @State private var isMiniPlayer = false
+
+    @AppStorage("CassettePlayer.MiniPlayer.AlwaysOnTop")
+    private var alwaysOnTop = true
+
+    @StateObject private var windowGeometry = WindowGeometryManager()
 
     // MARK: - Geometry
 
     private let deckWidth: CGFloat = 1024
     private let deckHeight: CGFloat = 283
+    private let miniPlayerWidth: CGFloat = 520
+    private let miniPlayerHeight: CGFloat = 104
 
     private let edgeInset: CGFloat = 25
     private let topInset: CGFloat = 20
@@ -65,56 +73,91 @@ struct PlayerView: View {
     var body: some View {
 
         ZStack {
-
-            deckBackground
-
-            deckLayout
-
-            if showLibrary {
-
-                LibraryView(
+            if isMiniPlayer {
+                MiniPlayerView(
                     audio: audio,
-                    onClose: {
-
-                        withAnimation(
-                            .easeInOut(
-                                duration: 0.42
-                            )
-                        ) {
-                            showLibrary = false
-                        }
-                    }
+                    alwaysOnTop: $alwaysOnTop,
+                    onReturnToMain: switchToMainPlayer
                 )
+                .frame(
+                    width: miniPlayerWidth,
+                    height: miniPlayerHeight
+                )
+            } else {
+                ZStack {
+                    deckBackground
+                    deckLayout
+
+                    if showLibrary {
+                        LibraryView(
+                            audio: audio,
+                            onClose: {
+                                withAnimation(.easeInOut(duration: 0.42)) {
+                                    showLibrary = false
+                                }
+                            }
+                        )
+                        .frame(
+                            width: deckWidth,
+                            height: deckHeight
+                        )
+                        .transition(.move(edge: .top))
+                        .zIndex(200)
+                    }
+                }
                 .frame(
                     width: deckWidth,
                     height: deckHeight
                 )
-                .transition(
-                    .move(
-                        edge: .top
-                    )
-                )
-                .zIndex(200)
             }
         }
         .frame(
-            width: deckWidth,
-            height: deckHeight
+            width: isMiniPlayer ? miniPlayerWidth : deckWidth,
+            height: isMiniPlayer ? miniPlayerHeight : deckHeight
         )
         .clipped()
+        .background {
+            WindowAccessor { window in
+                windowGeometry.attach(
+                    window,
+                    alwaysOnTop: alwaysOnTop
+                )
+            }
+        }
+        .onChange(of: alwaysOnTop) { newValue in
+            windowGeometry.setAlwaysOnTop(newValue)
+        }
         .onDrop(
-            of: [
-                UTType.fileURL.identifier
-            ],
+            of: [UTType.fileURL.identifier],
             isTargeted: nil
         ) { providers in
+            guard !isMiniPlayer else {
+                return false
+            }
 
-            handleDrop(
-                providers
-            )
-
+            handleDrop(providers)
             return true
         }
+    }
+
+    private func switchToMiniPlayer() {
+        guard !isMiniPlayer else { return }
+
+        isMiniPlayer = true
+        windowGeometry.switchMode(
+            toMini: true,
+            alwaysOnTop: alwaysOnTop
+        )
+    }
+
+    private func switchToMainPlayer() {
+        guard isMiniPlayer else { return }
+
+        isMiniPlayer = false
+        windowGeometry.switchMode(
+            toMini: false,
+            alwaysOnTop: alwaysOnTop
+        )
     }
 
     private func togglePlaylist() {
@@ -450,7 +493,8 @@ struct PlayerView: View {
                 cassetteSize: cassetteButtonSize,
                 timerSize: timerSize,
                 transportSize: transportSize,
-                audio: audio
+                audio: audio,
+                onMiniPlayer: switchToMiniPlayer
             )
             .position(
                 x:
@@ -637,6 +681,7 @@ private struct RightControlColumn: View {
     let transportSize: CGSize
 
     let audio: AudioPlayer
+    let onMiniPlayer: () -> Void
 
     var body: some View {
 
@@ -644,7 +689,8 @@ private struct RightControlColumn: View {
 
             CassetteButtonPlaceholder(
                 size: cassetteSize,
-                audio: audio
+                audio: audio,
+                onMiniPlayer: onMiniPlayer
             )
 
             TimerPlaceholder(
@@ -1495,6 +1541,7 @@ private struct CassetteButtonPlaceholder: View {
     let size: CGSize
 
     @ObservedObject var audio: AudioPlayer
+    let onMiniPlayer: () -> Void
 
     var body: some View {
 
@@ -1526,7 +1573,7 @@ private struct CassetteButtonPlaceholder: View {
             HStack(spacing: 3) {
 
                 Button {
-                    // Mini Player navigation will be connected in the next stage.
+                    onMiniPlayer()
                 } label: {
                     Color.clear
                 }
@@ -1539,7 +1586,7 @@ private struct CassetteButtonPlaceholder: View {
                         buttonHeight: 33
                     )
                 )
-                .help("Mini Player — coming soon")
+                .help("Switch to Mini Player")
 
                 Button {
                     // Fullscreen navigation will be connected in a later stage.
