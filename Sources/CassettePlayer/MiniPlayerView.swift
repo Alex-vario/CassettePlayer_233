@@ -14,7 +14,7 @@ struct MiniPlayerView: View {
         blue: 0.34
     )
 
-    private let panelWidth: CGFloat = 520
+    private let panelWidth: CGFloat = 600
     private let panelHeight: CGFloat = 60
 
     private var artistName: String {
@@ -79,7 +79,7 @@ struct MiniPlayerView: View {
                 }
                 .buttonStyle(
                     TransportButtonStyle(
-                        title: "⌂",
+                        title: "↑",
                         isActive: false,
                         momentary: true,
                         buttonWidth: 34,
@@ -118,7 +118,7 @@ struct MiniPlayerView: View {
     }
 
     private var transportControls: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 5) {
             miniTransportButton("◀◀", help: "Previous track", action: audio.previous)
 
             Button(action: audio.togglePlayPause) {
@@ -173,7 +173,7 @@ struct MiniPlayerView: View {
                 ZStack {
                     Rectangle()
                         .fill(Color.black.opacity(0.75))
-                        .frame(width: 14, height: 29)
+                        .frame(width: 14, height: 21)
                         .overlay {
                             Rectangle()
                                 .stroke(Color.white.opacity(0.16), lineWidth: 1)
@@ -195,7 +195,7 @@ struct MiniPlayerView: View {
                         .offset(y: alwaysOnTop ? -7 : 7)
                 }
             }
-            .frame(width: 22, height: 44)
+            .frame(width: 22, height: 33)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -216,10 +216,10 @@ private struct MiniMeterBar: View {
     let level: Float
     let green: Color
 
-    private let segmentCount = 12
+    private let segmentCount = 10
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 3) {
             ForEach(0..<segmentCount, id: \.self) { index in
                 let isActive = index < Int(
                     min(1, max(0, level)) * Float(segmentCount)
