@@ -1541,31 +1541,43 @@ private struct CassetteButtonPlaceholder: View {
                 )
                 .padding(3)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 3) {
 
-                if let cassetteImage = Self.cassetteImages[audio.cassetteName] {
-
-                    Image(nsImage: cassetteImage)
-                        .resizable()
-                        .aspectRatio(
-                            contentMode: .fit
-                        )
-                        .frame(
-                            width: 56,
-                            height: 29
-                        )
-                        .clipped()
+                Button {
+                    // Mini Player navigation will be connected in the next stage.
+                } label: {
+                    Color.clear
                 }
-
-                Spacer(
-                    minLength: 0
+                .buttonStyle(
+                    TransportButtonStyle(
+                        title: "MIN",
+                        isActive: false,
+                        momentary: true,
+                        buttonWidth: 40,
+                        buttonHeight: 33
+                    )
                 )
+                .help("Mini Player — coming soon")
 
-                Button(
-                    action: {
-                        audio.changeCassette()
-                    }
-                ) {
+                Button {
+                    // Fullscreen navigation will be connected in a later stage.
+                } label: {
+                    Color.clear
+                }
+                .buttonStyle(
+                    TransportButtonStyle(
+                        title: "MAX",
+                        isActive: false,
+                        momentary: true,
+                        buttonWidth: 40,
+                        buttonHeight: 33
+                    )
+                )
+                .help("Fullscreen mode — coming soon")
+
+                Button {
+                    audio.changeCassette()
+                } label: {
                     Color.clear
                 }
                 .buttonStyle(
@@ -1573,15 +1585,13 @@ private struct CassetteButtonPlaceholder: View {
                         title: "CH",
                         isActive: false,
                         momentary: true,
-                        buttonWidth: 61,
+                        buttonWidth: 40,
                         buttonHeight: 33
                     )
                 )
+                .help("Change cassette")
             }
-            .padding(
-                .horizontal,
-                5
-            )
+            .padding(.horizontal, 5)
         }
         .frame(
             width: size.width,
