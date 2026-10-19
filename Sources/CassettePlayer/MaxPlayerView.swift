@@ -628,7 +628,8 @@ struct MaxPlayerView: View {
         LibraryView(
             audio: audio,
             onClose: {},
-            showsCloseButton: false
+            showsCloseButton: false,
+            compactHeader: true
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 16))
