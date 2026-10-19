@@ -11,6 +11,7 @@ struct AudioTrack: Identifiable, Hashable {
     }
 
     var artist: String
+    var taggedTitle: String
     var album: String
     var bitrate: Int
     var artwork: Data?
@@ -75,6 +76,7 @@ struct AudioTrack: Identifiable, Hashable {
     init(url: URL) {
         self.url = url
         self.artist = ""
+        self.taggedTitle = ""
         self.album = ""
         self.bitrate = 0
         self.artwork = nil
@@ -89,6 +91,10 @@ struct AudioTrack: Identifiable, Hashable {
                 switch item.commonKey {
                 case .commonKeyArtist:
                     track.artist =
+                        (try? await item.load(.stringValue)) ?? ""
+
+                case .commonKeyTitle:
+                    track.taggedTitle =
                         (try? await item.load(.stringValue)) ?? ""
 
                 case .commonKeyAlbumName:
