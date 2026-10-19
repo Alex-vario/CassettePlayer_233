@@ -2,6 +2,79 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import CryptoKit
+import ImageIO
+
+// MARK: - Bounded in-memory artwork thumbnails
+
+/// Decodes small library thumbnails off the main thread. The cache is memory-only;
+/// NSCache evicts images under memory pressure and never creates per-cover files.
+private enum LibraryArtworkThumbnailCache {
+    private static let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 350
+        cache.totalCostLimit = 96 * 1024 * 1024
+        return cache
+    }()
+
+    /// OperationQueue provides a hard limit on simultaneous image decodes.
+    private static let decodeQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "CassettePlayer.LibraryArtworkDecode"
+        queue.qualityOfService = .utility
+        queue.maxConcurrentOperationCount = 3
+        return queue
+    }()
+
+    static func thumbnail(from data: Data, maxPixelSize: Int = 420) async -> NSImage? {
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        let key = "\(maxPixelSize)-\(digest)" as NSString
+
+        if let cached = cache.object(forKey: key) {
+            return cached
+        }
+
+        return await withCheckedContinuation { continuation in
+            decodeQueue.addOperation {
+                if let cached = cache.object(forKey: key) {
+                    continuation.resume(returning: cached)
+                    return
+                }
+
+                guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                let options: [CFString: Any] = [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                    kCGImageSourceShouldCache: true,
+                    kCGImageSourceShouldCacheImmediately: true
+                ]
+
+                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(
+                    source,
+                    0,
+                    options as CFDictionary
+                ) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                let image = NSImage(
+                    cgImage: cgImage,
+                    size: NSSize(width: cgImage.width, height: cgImage.height)
+                )
+                cache.setObject(image, forKey: key, cost: cgImage.bytesPerRow * cgImage.height)
+                continuation.resume(returning: image)
+            }
+        }
+    }
+
+    static func clear() {
+        cache.removeAllObjects()
+    }
+}
 
 // MARK: - Persistent Library Index
 
@@ -227,6 +300,7 @@ struct LibraryView: View {
     private var libraryFilterText = ""
     @State private var searchFolders: [URL] = []
     @State private var searchTracks: [AudioTrack] = []
+    @State private var folderArtworkByPath: [String: Data] = [:]
     @State private var isSearchIndexLoading = false
     @State private var searchIndexRootPath: String?
 
@@ -294,6 +368,8 @@ struct LibraryView: View {
             searchIndexRootPath = nil
             searchFolders = []
             searchTracks = []
+            folderArtworkByPath = [:]
+            LibraryArtworkThumbnailCache.clear()
             if !libraryFilterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 loadSearchIndexIfNeeded()
             }
@@ -991,6 +1067,44 @@ struct LibraryView: View {
         .padding(.top, 3)
     }
 
+    private func loadFolderArtworkMap(from index: LibraryIndexSnapshot) async {
+        let root = URL(fileURLWithPath: index.rootPath)
+        let artworkMap = await Task.detached(priority: .utility) {
+            Self.makeFolderArtworkMap(from: index.tracks, root: root)
+        }.value
+
+        guard selectedRoot?.standardizedFileURL.path == index.rootPath else { return }
+        folderArtworkByPath = artworkMap
+    }
+
+    private nonisolated static func makeFolderArtworkMap(
+        from tracks: [AudioTrack],
+        root: URL
+    ) -> [String: Data] {
+        let rootPath = root.standardizedFileURL.path
+        let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        var result: [String: Data] = [:]
+
+        // Tracks are path-sorted in the library index, so the first available
+        // embedded cover becomes the deterministic thumbnail for each folder.
+        for track in tracks {
+            guard let artwork = track.artwork else { continue }
+            var directory = track.url.deletingLastPathComponent().standardizedFileURL
+
+            while directory.path == rootPath || directory.path.hasPrefix(rootPrefix) {
+                if result[directory.path] == nil {
+                    result[directory.path] = artwork
+                }
+                if directory.path == rootPath { break }
+                let parent = directory.deletingLastPathComponent().standardizedFileURL
+                if parent.path == directory.path { break }
+                directory = parent
+            }
+        }
+
+        return result
+    }
+
     private func loadSearchIndexIfNeeded() {
         guard let root = selectedRoot else { return }
         guard searchIndexRootPath != root.path, !isSearchIndexLoading else { return }
@@ -1012,6 +1126,7 @@ struct LibraryView: View {
             searchIndexRootPath = index.rootPath
             searchFolders = index.folders
             searchTracks = index.tracks
+            await loadFolderArtworkMap(from: index)
             artists = await Task.detached(priority: .utility) {
                 Self.makeArtistGroups(from: index.tracks)
             }.value
@@ -1064,6 +1179,7 @@ struct LibraryView: View {
 
                 FolderTile(
                     folderURL: folder,
+                    artworkData: folderArtworkByPath[folder.standardizedFileURL.path],
                     onOpen: {
                         openFolder(folder)
                     },
@@ -1460,7 +1576,10 @@ struct LibraryView: View {
             searchIndexRootPath = index.rootPath
             searchFolders = index.folders
             searchTracks = index.tracks
-            artists = Self.makeArtistGroups(from: index.tracks)
+            await loadFolderArtworkMap(from: index)
+            artists = await Task.detached(priority: .utility) {
+                Self.makeArtistGroups(from: index.tracks)
+            }.value
 
             let visibleFolder = currentFolder ?? root
             let folderResult = Self.scanFolder(visibleFolder)
@@ -1644,7 +1763,10 @@ struct LibraryView: View {
             searchIndexRootPath = index.rootPath
             searchFolders = index.folders
             searchTracks = index.tracks
-            artists = Self.makeArtistGroups(from: index.tracks)
+            await loadFolderArtworkMap(from: index)
+            artists = await Task.detached(priority: .utility) {
+                Self.makeArtistGroups(from: index.tracks)
+            }.value
         }
     }
 
@@ -1874,17 +1996,9 @@ private struct ArtistGroup:
     let name: String
     let tracks: [AudioTrack]
 
-    var artwork: NSImage? {
-
-        for track in tracks {
-            if let data = track.artwork,
-               let image = NSImage(data: data)
-            {
-                return image
-            }
-        }
-
-        return nil
+    /// Raw artwork data only; image decoding is delegated to the shared thumbnail queue.
+    var artworkData: Data? {
+        tracks.first(where: { $0.artwork != nil })?.artwork
     }
 
     static func == (
@@ -1921,6 +2035,7 @@ private struct ArtistTile: View {
     let onPlay: () -> Void
 
     @State private var artworkVisible = false
+    @State private var artworkImage: NSImage?
 
     var body: some View {
 
@@ -1937,6 +2052,12 @@ private struct ArtistTile: View {
             1,
             contentMode: .fit
         )
+        .task {
+            guard let data = artist.artworkData else { return }
+            let image = await LibraryArtworkThumbnailCache.thumbnail(from: data)
+            guard !Task.isCancelled else { return }
+            artworkImage = image
+        }
     }
 
     private var artistMainButton: some View {
@@ -1986,8 +2107,7 @@ private struct ArtistTile: View {
                     0.52
                 )
 
-                if let artwork =
-                    artist.artwork {
+                if let artwork = artworkImage {
 
                     Image(
                         nsImage: artwork
@@ -2139,6 +2259,7 @@ private struct ArtistTile: View {
 private struct FolderTile: View {
 
     let folderURL: URL
+    let artworkData: Data?
 
     let onOpen: () -> Void
     let onPlay: () -> Void
@@ -2286,8 +2407,14 @@ private struct FolderTile: View {
             contentMode: .fit
         )
         .clipped()
-        .task {
-            artwork = await findArtwork(in: folderURL)
+        .task(id: artworkData?.hashValue) {
+            guard let data = artworkData else {
+                artwork = nil
+                return
+            }
+            let image = await LibraryArtworkThumbnailCache.thumbnail(from: data)
+            guard !Task.isCancelled else { return }
+            artwork = image
         }
     }
 
@@ -2604,57 +2731,6 @@ private struct TrackRow: View {
 }
 
 // MARK: - Artwork
-
-private func findArtwork(
-    in folder: URL
-) async -> NSImage? {
-
-    let fm =
-        FileManager.default
-
-    guard
-        let enumerator =
-            fm.enumerator(
-                at: folder,
-                includingPropertiesForKeys: nil,
-                options: [
-                    .skipsHiddenFiles
-                ]
-            )
-    else {
-        return nil
-    }
-
-    while let url = enumerator.nextObject() as? URL {
-        guard
-            [
-                "mp3",
-                "m4a",
-                "aac",
-                "flac",
-                "ogg"
-            ]
-            .contains(
-                url.pathExtension.lowercased()
-            )
-        else {
-            continue
-        }
-
-        let track = await AudioTrack.load(from: url)
-
-        if let data = track.artwork,
-           let image =
-                NSImage(
-                    data: data
-                )
-        {
-            return image
-        }
-    }
-
-    return nil
-}
 
 // MARK: - Button Styles
 
