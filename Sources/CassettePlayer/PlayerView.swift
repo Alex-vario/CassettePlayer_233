@@ -13,6 +13,8 @@ struct PlayerView: View {
     @State private var showLibrary = false
     @State private var isMiniPlayer = false
 
+    @StateObject private var fullscreenController = FullscreenModeController()
+
     @AppStorage("CassettePlayer.MiniPlayer.AlwaysOnTop")
     private var alwaysOnTop = true
 
@@ -86,35 +88,65 @@ struct PlayerView: View {
                 )
             } else {
                 ZStack {
-                    deckBackground
-                    deckLayout
+                    // Keep the existing deck and its library mounted underneath MAX.
+                    // This preserves their local state when returning from fullscreen.
+                    ZStack {
+                        deckBackground
+                        deckLayout
 
-                    if showLibrary {
-                        LibraryView(
-                            audio: audio,
-                            onClose: {
-                                withAnimation(.easeInOut(duration: 0.42)) {
-                                    showLibrary = false
+                        if showLibrary {
+                            LibraryView(
+                                audio: audio,
+                                onClose: {
+                                    withAnimation(.easeInOut(duration: 0.42)) {
+                                        showLibrary = false
+                                    }
                                 }
+                            )
+                            .frame(
+                                width: deckWidth,
+                                height: deckHeight
+                            )
+                            .transition(.move(edge: .top))
+                            .zIndex(200)
+                        }
+                    }
+                    .frame(
+                        width: deckWidth,
+                        height: deckHeight
+                    )
+                    .opacity(fullscreenController.isFullscreen ? 0 : 1)
+                    .allowsHitTesting(!fullscreenController.isFullscreen)
+
+                    if fullscreenController.isFullscreen {
+                        MaxPlayerView(
+                            audio: audio,
+                            onExit: {
+                                fullscreenController.exitFullscreen()
                             }
                         )
-                        .frame(
-                            width: deckWidth,
-                            height: deckHeight
-                        )
-                        .transition(.move(edge: .top))
-                        .zIndex(200)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
+                        .zIndex(500)
                     }
                 }
                 .frame(
-                    width: deckWidth,
-                    height: deckHeight
+                    width: fullscreenController.isFullscreen ? nil : deckWidth,
+                    height: fullscreenController.isFullscreen ? nil : deckHeight
                 )
             }
         }
         .frame(
-            width: isMiniPlayer ? miniPlayerWidth : deckWidth,
-            height: isMiniPlayer ? miniPlayerHeight : deckHeight
+            width: isMiniPlayer
+                ? miniPlayerWidth
+                : (fullscreenController.isFullscreen ? nil : deckWidth),
+            height: isMiniPlayer
+                ? miniPlayerHeight
+                : (fullscreenController.isFullscreen ? nil : deckHeight)
+        )
+        .frame(
+            maxWidth: fullscreenController.isFullscreen && !isMiniPlayer ? .infinity : nil,
+            maxHeight: fullscreenController.isFullscreen && !isMiniPlayer ? .infinity : nil
         )
         .clipped()
         .background {
@@ -123,6 +155,7 @@ struct PlayerView: View {
                     window,
                     alwaysOnTop: alwaysOnTop
                 )
+                fullscreenController.attach(window)
             }
         }
         .onChange(of: alwaysOnTop) { newValue in
@@ -132,7 +165,7 @@ struct PlayerView: View {
             of: [UTType.fileURL.identifier],
             isTargeted: nil
         ) { providers in
-            // The same file/folder import logic works in both main and mini modes.
+            // The same file/folder import logic works in main and mini modes.
             handleDrop(providers)
             return true
         }
@@ -156,6 +189,11 @@ struct PlayerView: View {
             toMini: false,
             alwaysOnTop: alwaysOnTop
         )
+    }
+
+    private func switchToMaxPlayer() {
+        guard !isMiniPlayer else { return }
+        fullscreenController.enterFullscreen()
     }
 
     private func togglePlaylist() {
@@ -492,7 +530,8 @@ struct PlayerView: View {
                 timerSize: timerSize,
                 transportSize: transportSize,
                 audio: audio,
-                onMiniPlayer: switchToMiniPlayer
+                onMiniPlayer: switchToMiniPlayer,
+                onMaxPlayer: switchToMaxPlayer
             )
             .position(
                 x:
@@ -680,6 +719,7 @@ private struct RightControlColumn: View {
 
     let audio: AudioPlayer
     let onMiniPlayer: () -> Void
+    let onMaxPlayer: () -> Void
 
     var body: some View {
 
@@ -688,7 +728,8 @@ private struct RightControlColumn: View {
             CassetteButtonPlaceholder(
                 size: cassetteSize,
                 audio: audio,
-                onMiniPlayer: onMiniPlayer
+                onMiniPlayer: onMiniPlayer,
+                onMaxPlayer: onMaxPlayer
             )
 
             TimerPlaceholder(
@@ -1540,6 +1581,7 @@ private struct CassetteButtonPlaceholder: View {
 
     @ObservedObject var audio: AudioPlayer
     let onMiniPlayer: () -> Void
+    let onMaxPlayer: () -> Void
 
     var body: some View {
 
@@ -1587,7 +1629,7 @@ private struct CassetteButtonPlaceholder: View {
                 .help("Switch to Mini Player")
 
                 Button {
-                    // Fullscreen navigation will be connected in a later stage.
+                    onMaxPlayer()
                 } label: {
                     Color.clear
                 }
@@ -1600,7 +1642,7 @@ private struct CassetteButtonPlaceholder: View {
                         buttonHeight: 33
                     )
                 )
-                .help("Fullscreen mode — coming soon")
+                .help("Open fullscreen MAX mode")
 
                 Button {
                     audio.changeCassette()
