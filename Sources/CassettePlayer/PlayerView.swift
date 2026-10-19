@@ -133,10 +133,7 @@ struct PlayerView: View {
             of: [UTType.fileURL.identifier],
             isTargeted: nil
         ) { providers in
-            guard !isMiniPlayer else {
-                return false
-            }
-
+            // The same file/folder import logic works in both main and mini modes.
             handleDrop(providers)
             return true
         }
