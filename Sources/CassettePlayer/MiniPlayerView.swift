@@ -101,14 +101,14 @@ struct MiniPlayerView: View {
 
             RoundedRectangle(cornerRadius: 2)
                 .fill(
-                    Color(red: 0.003, green: 0.018, blue: 0.011)
+                    Color(red: 0.002, green: 0.010, blue: 0.006)
                 )
                 .overlay {
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.025),
+                            Color.white.opacity(0.055),
                             Color.clear,
-                            Color.black.opacity(0.16)
+                            Color.black.opacity(0.30)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -148,9 +148,9 @@ struct MiniPlayerView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.028),
-                                    Color.white.opacity(0.008),
-                                    Color.black.opacity(0.24)
+                                    Color.white.opacity(0.060),
+                                    Color.white.opacity(0.006),
+                                    Color.black.opacity(0.34)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -159,7 +159,7 @@ struct MiniPlayerView: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 2)
-                        .stroke(Color.white.opacity(0.045), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.085), lineWidth: 1)
                 }
                 .blur(radius: 0.65)
                 .allowsHitTesting(false)
