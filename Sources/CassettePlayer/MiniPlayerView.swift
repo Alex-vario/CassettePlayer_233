@@ -57,16 +57,8 @@ struct MiniPlayerView: View {
                 .padding(3)
 
             HStack(spacing: 5) {
-                compactMeters
-                    .frame(width: 123)
-
-                verticalDivider
-
-                VStack(alignment: .leading, spacing: 2) {
-                    MiniScrollingTextLine(name: artistName, green: green, fontSize: 10)
-                    MiniScrollingTextLine(name: trackTitle, green: green, fontSize: 11)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                displayPanel
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 verticalDivider
 
@@ -95,6 +87,74 @@ struct MiniPlayerView: View {
         }
         .frame(width: panelWidth, height: panelHeight)
         .clipped()
+    }
+
+    /// Shared cloudy plastic panel for both stereo meters and track metadata.
+    private var displayPanel: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.black.opacity(0.48))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.black.opacity(0.9), lineWidth: 2)
+                }
+
+            RoundedRectangle(cornerRadius: 2)
+                .fill(
+                    Color(red: 0.008, green: 0.045, blue: 0.028)
+                )
+                .overlay {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.025),
+                            Color.clear,
+                            Color.black.opacity(0.16)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+                }
+                .padding(3)
+
+            HStack(spacing: 8) {
+                compactMeters
+                    .frame(width: 123)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    MiniScrollingTextLine(name: artistName, green: green, fontSize: 10)
+                    MiniScrollingTextLine(name: trackTitle, green: green, fontSize: 11)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+
+            // Slightly cloudy plastic layer, matching the main indicator block.
+            RoundedRectangle(cornerRadius: 2)
+                .fill(
+                    Color(red: 0.025, green: 0.045, blue: 0.035)
+                        .opacity(0.15)
+                )
+                .background {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(.thinMaterial)
+                        .opacity(0.10)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Color.white.opacity(0.045), lineWidth: 1)
+                }
+                .blur(radius: 0.35)
+                .allowsHitTesting(false)
+
+            // Shared soft green halo around the illuminated contents.
+            RoundedRectangle(cornerRadius: 2)
+                .stroke(green.opacity(0.10), lineWidth: 7)
+                .blur(radius: 20)
+                .allowsHitTesting(false)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 
     private var compactMeters: some View {
