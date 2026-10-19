@@ -233,6 +233,18 @@ struct PlaylistView: View {
                 )
 
             HStack {
+                Text("\(audio.playlist.count) TRACKS")
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .medium,
+                            design: .monospaced
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(0.70)
+                    )
+
                 Spacer()
 
                 Text(formatDuration(totalDuration))
