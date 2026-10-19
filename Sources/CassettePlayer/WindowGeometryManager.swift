@@ -76,6 +76,7 @@ final class WindowGeometryManager: ObservableObject {
         saveCurrentFrame()
         let previousFrame = window.frame
         mode = targetMode
+        applyMiniTitlebarMode(isMini: toMini)
 
         let targetSize = toMini
             ? NSSize(width: 520, height: 75)
@@ -83,11 +84,14 @@ final class WindowGeometryManager: ObservableObject {
 
         if let savedFrame = storedFrame(for: targetMode),
            isVisibleOnScreen(savedFrame) {
-            // A previously saved Mini Player frame may still have the old 104 pt height.
-            // Apply the current size while keeping the top edge in the same place.
             var targetFrame = savedFrame
-            targetFrame.size = targetSize
-            targetFrame.origin.y = savedFrame.maxY - targetFrame.height
+
+            if toMini {
+                // Force the current Mini Player size, even if an older 54/104 pt frame was saved.
+                targetFrame.size = targetSize
+                targetFrame.origin.y = savedFrame.maxY - targetFrame.height
+            }
+
             window.setFrame(targetFrame, display: true, animate: true)
         } else {
             window.setContentSize(targetSize)
@@ -107,7 +111,6 @@ final class WindowGeometryManager: ObservableObject {
             window.setFrame(targetFrame, display: true, animate: true)
         }
 
-        applyMiniTitlebarMode(isMini: toMini)
         applyWindowLevel(alwaysOnTop: alwaysOnTop)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
