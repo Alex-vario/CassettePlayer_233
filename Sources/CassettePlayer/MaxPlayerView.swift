@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import CoreImage
+import ImageIO
 
 /// Controls native macOS fullscreen transitions and mirrors the window's actual state.
 final class FullscreenModeController: ObservableObject {
@@ -79,6 +80,7 @@ struct MaxPlayerView: View {
     @State private var coverImage: NSImage?
     @State private var blurredBackgroundImage: NSImage?
     @State private var artworkGeneration = 0
+    @State private var artworkTask: Task<Void, Never>?
 
     @State private var isSeeking = false
     @State private var seekTime: TimeInterval = 0
@@ -183,9 +185,9 @@ struct MaxPlayerView: View {
     private func prepareArtwork() {
         artworkGeneration += 1
         let generation = artworkGeneration
-        let artworkData = audio.currentTrack?.artwork
+        artworkTask?.cancel()
 
-        guard let artworkData else {
+        guard let artworkData = audio.currentTrack?.artwork else {
             withAnimation(.easeInOut(duration: 0.65)) {
                 coverImage = nil
                 blurredBackgroundImage = nil
@@ -193,41 +195,73 @@ struct MaxPlayerView: View {
             return
         }
 
-        guard let original = NSImage(data: artworkData) else {
-            withAnimation(.easeInOut(duration: 0.65)) {
-                coverImage = nil
-                blurredBackgroundImage = nil
+        // Image decoding and blur rasterization can be expensive for large embedded
+        // covers, so keep that work off the main thread.
+        artworkTask = Task {
+            let preparedImages = await Task.detached(priority: .userInitiated) {
+                Self.prepareArtworkImages(from: artworkData)
+            }.value
+
+            guard !Task.isCancelled, generation == artworkGeneration else { return }
+
+            let original = preparedImages.original.map {
+                NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height))
             }
-            return
-        }
+            let blurred = preparedImages.blurred.map {
+                NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height))
+            }
 
-        let blurred = Self.makeBlurredBackground(from: artworkData)
-
-        guard generation == artworkGeneration else { return }
-
-        withAnimation(.easeInOut(duration: 0.85)) {
-            coverImage = original
-            blurredBackgroundImage = blurred
+            withAnimation(.easeInOut(duration: 0.65)) {
+                coverImage = original
+                blurredBackgroundImage = blurred
+            }
         }
     }
 
-    /// The blur is rasterized once per track change, not recomputed during animation.
-    private static func makeBlurredBackground(from data: Data) -> NSImage? {
-        guard let source = CIImage(data: data) else { return nil }
-
-        let blurred = source
-            .clampedToExtent()
-            .applyingFilter("CIGaussianBlur", parameters: ["inputRadius": 48])
-            .cropped(to: source.extent)
-
-        guard let cgImage = imageContext.createCGImage(blurred, from: source.extent) else {
-            return nil
+    /// Decodes the crisp cover at its original resolution, but downsamples the
+    /// background copy before blurring it. A 1600 px maximum is ample for a
+    /// fullscreen backdrop and greatly reduces Core Image work and memory use.
+    private static func prepareArtworkImages(from data: Data) -> (original: CGImage?, blurred: CGImage?) {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return (nil, nil)
         }
 
-        return NSImage(
-            cgImage: cgImage,
-            size: NSSize(width: cgImage.width, height: cgImage.height)
+        let originalOptions: [CFString: Any] = [
+            kCGImageSourceShouldCache: true,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        let original = CGImageSourceCreateImageAtIndex(
+            source,
+            0,
+            originalOptions as CFDictionary
         )
+
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1600,
+            kCGImageSourceShouldCache: true,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            thumbnailOptions as CFDictionary
+        ) else {
+            return (original, nil)
+        }
+
+        return (original, makeBlurredBackground(from: thumbnail))
+    }
+
+    private static func makeBlurredBackground(from image: CGImage) -> CGImage? {
+        let source = CIImage(cgImage: image)
+        let blurred = source
+            .clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: ["inputRadius": 38])
+            .cropped(to: source.extent)
+
+        return imageContext.createCGImage(blurred, from: source.extent)
     }
 
     // MARK: - Left panel
@@ -691,12 +725,14 @@ struct MaxPlayerView: View {
 private extension View {
     func panelSurface() -> some View {
         self
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            // A tinted translucent fill avoids the live backdrop blur cost of
+            // ultraThinMaterial while still showing the MAX artwork underneath.
+            .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 16))
             .overlay {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.white.opacity(0.09), lineWidth: 1)
             }
-            .shadow(color: .black.opacity(0.12), radius: 18, y: 8)
+            .shadow(color: .black.opacity(0.10), radius: 8, y: 4)
     }
 }
 
