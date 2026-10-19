@@ -69,14 +69,19 @@ final class WindowGeometryManager: ObservableObject {
         let previousFrame = window.frame
         mode = targetMode
 
+        let targetSize = toMini
+            ? NSSize(width: 520, height: 54)
+            : NSSize(width: 1024, height: 283)
+
         if let savedFrame = storedFrame(for: targetMode),
            isVisibleOnScreen(savedFrame) {
-            window.setFrame(savedFrame, display: true, animate: true)
+            // A previously saved Mini Player frame may still have the old 104 pt height.
+            // Apply the current size while keeping the top edge in the same place.
+            var targetFrame = savedFrame
+            targetFrame.size = targetSize
+            targetFrame.origin.y = savedFrame.maxY - targetFrame.height
+            window.setFrame(targetFrame, display: true, animate: true)
         } else {
-            let targetSize = toMini
-                ? NSSize(width: 520, height: 54)
-                : NSSize(width: 1024, height: 283)
-
             window.setContentSize(targetSize)
 
             var targetFrame = window.frame
