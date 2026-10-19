@@ -121,11 +121,9 @@ struct MiniPlayerView: View {
         HStack(spacing: 2) {
             miniTransportButton("◀◀", help: "Previous track", action: audio.previous)
 
-            miniTransportButton(
-                audio.isPlaying ? "Ⅱ" : "▶",
-                help: audio.isPlaying ? "Pause" : "Play",
-                action: audio.togglePlayPause
-            )
+            Button(action: audio.togglePlayPause) {
+                Color.clear
+            }
             .buttonStyle(
                 TransportButtonStyle(
                     title: audio.isPlaying ? "Ⅱ" : "▶",
@@ -135,6 +133,7 @@ struct MiniPlayerView: View {
                     buttonHeight: 33
                 )
             )
+            .help(audio.isPlaying ? "Pause" : "Play")
 
             miniTransportButton("▶▶", help: "Next track", action: audio.next)
         }
