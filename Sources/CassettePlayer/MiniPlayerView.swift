@@ -129,28 +129,44 @@ struct MiniPlayerView: View {
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
+            .shadow(color: green.opacity(0.10), radius: 5, x: 0, y: 0)
 
-            // Slightly cloudy plastic layer, matching the main indicator block.
+            // Stronger frosted-plastic layer: more visible haze, soft highlights,
+            // and a little more translucency without obscuring the readout.
             RoundedRectangle(cornerRadius: 2)
                 .fill(
                     Color(red: 0.025, green: 0.045, blue: 0.035)
-                        .opacity(0.15)
+                        .opacity(0.27)
                 )
                 .background {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(.thinMaterial)
-                        .opacity(0.10)
+                        .opacity(0.22)
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 2)
-                        .stroke(Color.white.opacity(0.045), lineWidth: 1)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.075),
+                                    Color.white.opacity(0.018),
+                                    Color.black.opacity(0.10)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
-                .blur(radius: 0.35)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Color.white.opacity(0.075), lineWidth: 1)
+                }
+                .blur(radius: 0.65)
                 .allowsHitTesting(false)
 
-            // Shared soft green halo around the illuminated contents.
+            // Wider, brighter shared halo, still diffused rather than a hard frame.
             RoundedRectangle(cornerRadius: 2)
-                .stroke(green.opacity(0.10), lineWidth: 7)
+                .stroke(green.opacity(0.16), lineWidth: 9)
                 .blur(radius: 20)
                 .allowsHitTesting(false)
         }
@@ -291,10 +307,18 @@ private struct MiniMeterBar: View {
                     Rectangle()
                         .fill(color)
                         .opacity(isActive ? 0.95 : 0.13)
+                        .shadow(
+                            color: color.opacity(isActive ? 0.55 : 0),
+                            radius: isActive ? 3.5 : 0
+                        )
 
                     Rectangle()
                         .fill(color)
                         .opacity(isActive ? 0.95 : 0.13)
+                        .shadow(
+                            color: color.opacity(isActive ? 0.55 : 0),
+                            radius: isActive ? 3.5 : 0
+                        )
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 8)
@@ -343,6 +367,7 @@ private struct MiniScrollingTextLine: View {
                 Text(name)
                     .font(.system(size: fontSize, weight: .medium, design: .monospaced))
                     .foregroundStyle(green)
+                    .shadow(color: green.opacity(0.48), radius: 3, x: 0, y: 0)
                     .fixedSize()
                     .offset(x: -offset)
             }
