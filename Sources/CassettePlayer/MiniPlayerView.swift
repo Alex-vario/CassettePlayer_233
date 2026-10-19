@@ -15,7 +15,7 @@ struct MiniPlayerView: View {
     )
 
     private let panelWidth: CGFloat = 520
-    private let panelHeight: CGFloat = 75
+    private let panelHeight: CGFloat = 60
 
     private var artistName: String {
         guard let track = audio.currentTrack else {
@@ -79,7 +79,7 @@ struct MiniPlayerView: View {
                 }
                 .buttonStyle(
                     TransportButtonStyle(
-                        title: "↩",
+                        title: "⌂",
                         isActive: false,
                         momentary: true,
                         buttonWidth: 34,
@@ -228,11 +228,17 @@ private struct MiniMeterBar: View {
                     ? Color(red: 0.92, green: 0.24, blue: 0.035)
                     : green
 
-                Rectangle()
-                    .fill(color)
-                    .opacity(isActive ? 0.95 : 0.13)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 8)
+                HStack(spacing: 1) {
+                    Rectangle()
+                        .fill(color)
+                        .opacity(isActive ? 0.95 : 0.13)
+
+                    Rectangle()
+                        .fill(color)
+                        .opacity(isActive ? 0.95 : 0.13)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 8)
             }
         }
         .frame(height: 10)
