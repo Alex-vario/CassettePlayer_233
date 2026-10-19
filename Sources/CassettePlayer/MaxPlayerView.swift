@@ -56,7 +56,7 @@ final class FullscreenModeController: ObservableObject {
     func exitFullscreen() {
         guard let window, isFullscreen, !isTransitioning else { return }
         isTransitioning = true
-        isFullscreen = false
+        // Keep MAX visible during the native exit animation; didExit updates the state.
         window.toggleFullScreen(nil)
     }
 
