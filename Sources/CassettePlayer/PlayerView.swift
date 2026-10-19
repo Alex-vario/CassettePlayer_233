@@ -44,7 +44,7 @@ struct PlayerView: View {
     private let transportSize =
         CGSize(width: 136, height: 171)
 
-    private let playlistPanelWidth: CGFloat = 180
+    private let playlistPanelWidth: CGFloat = 500
 
     private let lowerButtonsSize =
         CGSize(width: 321, height: 43)
@@ -485,7 +485,8 @@ struct PlayerView: View {
                 .position(
                     x:
                         x4
-                        + transportSize.width / 2,
+                        + transportSize.width / 2
+                        - (playlistPanelWidth - 180) / 2,
                     y:
                         deckHeight / 2
                 )
