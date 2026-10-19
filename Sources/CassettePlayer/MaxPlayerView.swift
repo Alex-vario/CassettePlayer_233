@@ -13,7 +13,9 @@ final class FullscreenModeController: ObservableObject {
 
     func attach(_ window: NSWindow) {
         guard self.window !== window else {
-            isFullscreen = window.styleMask.contains(.fullScreen)
+            if !isTransitioning {
+                isFullscreen = window.styleMask.contains(.fullScreen)
+            }
             return
         }
 
