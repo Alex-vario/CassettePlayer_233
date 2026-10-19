@@ -10,7 +10,7 @@ struct MiniPlayerView: View {
 
     private let green = Color(
         red: 0.025,
-        green: 0.72,
+        green: 0.84,
         blue: 0.34
     )
 
@@ -136,7 +136,7 @@ struct MiniPlayerView: View {
             RoundedRectangle(cornerRadius: 2)
                 .fill(
                     Color(red: 0.006, green: 0.014, blue: 0.009)
-                        .opacity(0.62)
+                        .opacity(0.48)
                 )
                 .background {
                     RoundedRectangle(cornerRadius: 2)
@@ -306,10 +306,10 @@ private struct MiniMeterBar: View {
                 HStack(spacing: 1) {
                     Rectangle()
                         .fill(color)
-                        .opacity(isActive ? 0.95 : 0.13)
+                        .opacity(isActive ? 1.0 : 0.22)
                         .shadow(
-                            color: color.opacity(isActive ? 0.55 : 0),
-                            radius: isActive ? 3.5 : 0
+                            color: color.opacity(isActive ? 0.82 : 0),
+                            radius: isActive ? 4.5 : 0
                         )
 
                     Rectangle()
@@ -359,7 +359,7 @@ private struct MiniScrollingTextLine: View {
             ZStack(alignment: .leading) {
                 Text(name)
                     .font(.system(size: fontSize, weight: .medium, design: .monospaced))
-                    .foregroundStyle(green.opacity(0.22))
+                    .foregroundStyle(green.opacity(0.34))
                     .fixedSize()
                     .blur(radius: 2)
                     .offset(x: -offset)
@@ -367,7 +367,7 @@ private struct MiniScrollingTextLine: View {
                 Text(name)
                     .font(.system(size: fontSize, weight: .medium, design: .monospaced))
                     .foregroundStyle(green)
-                    .shadow(color: green.opacity(0.48), radius: 3, x: 0, y: 0)
+                    .shadow(color: green.opacity(0.78), radius: 4.5, x: 0, y: 0)
                     .fixedSize()
                     .offset(x: -offset)
             }
