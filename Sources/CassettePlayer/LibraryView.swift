@@ -207,6 +207,7 @@ struct LibraryView: View {
 
     let onClose: () -> Void
     var showsCloseButton: Bool = true
+    var compactHeader: Bool = false
 
     @State private var currentFolder: URL?
     @State private var folders: [URL] = []
@@ -296,6 +297,16 @@ struct LibraryView: View {
     // MARK: - Header
 
     private var header: some View {
+        Group {
+            if compactHeader {
+                compactHeaderContent
+            } else {
+                standardHeader
+            }
+        }
+    }
+
+    private var standardHeader: some View {
 
         HStack(spacing: 8) {
 
@@ -444,6 +455,110 @@ struct LibraryView: View {
         .background(
             Color.black.opacity(0.30)
         )
+    }
+
+    private var compactHeaderContent: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                modeButton(
+                    title: "ПАПКИ",
+                    active: libraryMode == 0
+                ) {
+                    libraryMode = 0
+                    selectedArtist = nil
+
+                    if let folder = currentFolder {
+                        reloadFolder(folder)
+                    } else if let root = selectedRoot {
+                        currentFolder = root
+                        reloadFolder(root)
+                    }
+                }
+
+                modeButton(
+                    title: "ИСПОЛНИТЕЛИ",
+                    active: libraryMode == 1
+                ) {
+                    libraryMode = 1
+                    selectedArtist = nil
+                    loadArtists()
+                }
+
+                Spacer(minLength: 2)
+
+                Button {
+                    refreshLibraryIndex()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.82))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Обновить библиотеку")
+
+                Button {
+                    chooseLibraryFolder()
+                } label: {
+                    Text("ПАПКА")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.9))
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 5) {
+                filterModeButton(title: "ПАПКИ", mode: "folder")
+                filterModeButton(title: "ИСП.", mode: "artist")
+                filterModeButton(title: "ТРЕК", mode: "track")
+
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.55))
+
+                    TextField(filterPlaceholder, text: $libraryFilterText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.white.opacity(0.92))
+                        .disableAutocorrection(true)
+
+                    if !libraryFilterText.isEmpty {
+                        Button {
+                            libraryFilterText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.white.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Очистить фильтр")
+                    }
+                }
+                .padding(.horizontal, 6)
+                .frame(minWidth: 60, maxWidth: .infinity)
+                .frame(height: 26)
+                .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.10), lineWidth: 1))
+            }
+
+            HStack(spacing: 8) {
+                breadcrumbInline
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Slider(
+                    value: $libraryTileSize,
+                    in: 72...120
+                )
+                .frame(width: 76)
+                .help("Размер плиток")
+                .accessibilityLabel("Размер плиток библиотеки")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(Color.black.opacity(0.30))
     }
 
     private var filterPlaceholder: String {
