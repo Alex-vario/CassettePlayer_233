@@ -47,12 +47,14 @@ final class FullscreenModeController: ObservableObject {
     func enterFullscreen() {
         guard let window, !isFullscreen, !isTransitioning else { return }
         isTransitioning = true
+        isFullscreen = true
         window.toggleFullScreen(nil)
     }
 
     func exitFullscreen() {
         guard let window, isFullscreen, !isTransitioning else { return }
         isTransitioning = true
+        isFullscreen = false
         window.toggleFullScreen(nil)
     }
 
