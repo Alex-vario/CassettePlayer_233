@@ -23,7 +23,7 @@ struct PlayerView: View {
     private let deckWidth: CGFloat = 1024
     private let deckHeight: CGFloat = 283
     private let miniPlayerWidth: CGFloat = 520
-    private let miniPlayerHeight: CGFloat = 104
+    private let miniPlayerHeight: CGFloat = 54
 
     private let edgeInset: CGFloat = 25
     private let topInset: CGFloat = 20
@@ -76,6 +76,7 @@ struct PlayerView: View {
             if isMiniPlayer {
                 MiniPlayerView(
                     audio: audio,
+                    levelMeter: audio.levelMeter,
                     alwaysOnTop: $alwaysOnTop,
                     onReturnToMain: switchToMainPlayer
                 )
@@ -2307,7 +2308,7 @@ private struct TransportPlaceholder: View {
     }
 }
 
-private struct TransportButtonStyle: ButtonStyle {
+struct TransportButtonStyle: ButtonStyle {
 
     let title: String
     let isActive: Bool
