@@ -216,7 +216,7 @@ private struct MiniMeterBar: View {
     let level: Float
     let green: Color
 
-    private let segmentCount = 8
+    private let segmentCount = 9
 
     var body: some View {
         HStack(spacing: 3) {
@@ -224,7 +224,7 @@ private struct MiniMeterBar: View {
                 let isActive = index < Int(
                     min(1, max(0, level)) * Float(segmentCount)
                 )
-                let color = index >= 9
+                let color = index >= segmentCount - 1
                     ? Color(red: 0.92, green: 0.24, blue: 0.035)
                     : green
 
@@ -238,10 +238,10 @@ private struct MiniMeterBar: View {
                         .opacity(isActive ? 0.95 : 0.13)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 9)
+                .frame(height: 8)
             }
         }
-        .frame(height: 11)
+        .frame(height: 10)
         .padding(.horizontal, 3)
         .background(Color.black.opacity(0.75))
         .overlay {
