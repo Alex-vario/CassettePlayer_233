@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
 
 struct MiniPlayerView: View {
 
@@ -8,7 +7,6 @@ struct MiniPlayerView: View {
     @ObservedObject var levelMeter: AudioLevelMeter
     @Binding var alwaysOnTop: Bool
     let onReturnToMain: () -> Void
-    let onDrop: ([NSItemProvider]) -> Void
 
     private let green = Color(
         red: 0.025,
@@ -89,13 +87,6 @@ struct MiniPlayerView: View {
         }
         .frame(width: panelWidth, height: panelHeight)
         .clipped()
-        .onDrop(
-            of: [UTType.fileURL.identifier],
-            isTargeted: nil
-        ) { providers in
-            onDrop(providers)
-            return true
-        }
     }
 
     /// Shared cloudy plastic panel for both stereo meters and track metadata.
