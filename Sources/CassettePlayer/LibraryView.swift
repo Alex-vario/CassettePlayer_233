@@ -26,15 +26,13 @@ private enum LibraryArtworkThumbnailCache {
     }()
 
     static func thumbnail(from data: Data, maxPixelSize: Int = 420) async -> NSImage? {
-        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        let key = "\(maxPixelSize)-\(digest)" as NSString
-
-        if let cached = cache.object(forKey: key) {
-            return cached
-        }
-
         return await withCheckedContinuation { continuation in
             decodeQueue.addOperation {
+                // Hashing can be expensive for large embedded covers, so it is
+                // deliberately done inside the background decode queue as well.
+                let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                let key = "\(maxPixelSize)-\(digest)" as NSString
+
                 if let cached = cache.object(forKey: key) {
                     continuation.resume(returning: cached)
                     return
@@ -301,6 +299,7 @@ struct LibraryView: View {
     @State private var searchFolders: [URL] = []
     @State private var searchTracks: [AudioTrack] = []
     @State private var folderArtworkByPath: [String: Data] = [:]
+    @State private var folderArtworkGeneration = 0
     @State private var isSearchIndexLoading = false
     @State private var searchIndexRootPath: String?
 
@@ -369,6 +368,7 @@ struct LibraryView: View {
             searchFolders = []
             searchTracks = []
             folderArtworkByPath = [:]
+            folderArtworkGeneration += 1
             LibraryArtworkThumbnailCache.clear()
             if !libraryFilterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 loadSearchIndexIfNeeded()
@@ -1075,6 +1075,7 @@ struct LibraryView: View {
 
         guard selectedRoot?.standardizedFileURL.path == index.rootPath else { return }
         folderArtworkByPath = artworkMap
+        folderArtworkGeneration += 1
     }
 
     private nonisolated static func makeFolderArtworkMap(
@@ -1180,6 +1181,7 @@ struct LibraryView: View {
                 FolderTile(
                     folderURL: folder,
                     artworkData: folderArtworkByPath[folder.standardizedFileURL.path],
+                    artworkGeneration: folderArtworkGeneration,
                     onOpen: {
                         openFolder(folder)
                     },
@@ -2261,6 +2263,7 @@ private struct FolderTile: View {
 
     let folderURL: URL
     let artworkData: Data?
+    let artworkGeneration: Int
 
     let onOpen: () -> Void
     let onPlay: () -> Void
@@ -2408,7 +2411,7 @@ private struct FolderTile: View {
             contentMode: .fit
         )
         .clipped()
-        .task(id: artworkData?.hashValue) {
+        .task(id: artworkGeneration) {
             guard let data = artworkData else {
                 artwork = nil
                 return
