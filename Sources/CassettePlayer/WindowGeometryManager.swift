@@ -79,7 +79,7 @@ final class WindowGeometryManager: ObservableObject {
         applyMiniTitlebarMode(isMini: toMini)
 
         let targetSize = toMini
-            ? NSSize(width: 520, height: 75)
+            ? NSSize(width: 520, height: 60)
             : NSSize(width: 1024, height: 283)
 
         if let savedFrame = storedFrame(for: targetMode),
@@ -87,7 +87,7 @@ final class WindowGeometryManager: ObservableObject {
             var targetFrame = savedFrame
 
             if toMini {
-                // Force the current Mini Player size, even if an older 54/104 pt frame was saved.
+                // Force the current Mini Player size, even if an older height was saved.
                 targetFrame.size = targetSize
                 targetFrame.origin.y = savedFrame.maxY - targetFrame.height
             }
