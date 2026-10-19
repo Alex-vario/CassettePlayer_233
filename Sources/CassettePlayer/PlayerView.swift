@@ -22,7 +22,7 @@ struct PlayerView: View {
 
     private let deckWidth: CGFloat = 1024
     private let deckHeight: CGFloat = 283
-    private let miniPlayerWidth: CGFloat = 520
+    private let miniPlayerWidth: CGFloat = 600
     private let miniPlayerHeight: CGFloat = 60
 
     private let edgeInset: CGFloat = 25
