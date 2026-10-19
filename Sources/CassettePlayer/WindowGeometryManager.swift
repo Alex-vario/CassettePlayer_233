@@ -79,7 +79,7 @@ final class WindowGeometryManager: ObservableObject {
         applyMiniTitlebarMode(isMini: toMini)
 
         let targetSize = toMini
-            ? NSSize(width: 520, height: 60)
+            ? NSSize(width: 600, height: 60)
             : NSSize(width: 1024, height: 283)
 
         if let savedFrame = storedFrame(for: targetMode),
