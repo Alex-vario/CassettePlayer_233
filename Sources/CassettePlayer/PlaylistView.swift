@@ -7,7 +7,7 @@ struct PlaylistView: View {
     @ObservedObject var audio: AudioPlayer
     let onClose: () -> Void
 
-    private let panelWidth: CGFloat = 180
+    private let panelWidth: CGFloat = 500
     private let panelHeight: CGFloat = 283
 
     @State private var durations: [URL: TimeInterval] = [:]
@@ -404,14 +404,18 @@ private struct PlaylistTrackRow: View {
             )
             .font(
                 .system(
-                    size: 10,
+                    size: 11,
                     weight: isCurrent ? .semibold : .regular,
                     design: .default
                 )
             )
             .foregroundStyle(
                 isCurrent
-                    ? Color.white.opacity(0.94)
+                    ? Color(
+                        red: 0.025,
+                        green: 0.72,
+                        blue: 0.34
+                    )
                     : Color.white.opacity(0.72)
             )
             .lineLimit(1)
