@@ -85,6 +85,7 @@ struct MaxPlayerView: View {
 
     @State private var trackDurations: [URL: TimeInterval] = [:]
     @State private var playlistTotalDuration: TimeInterval = 0
+    @State private var durationLoadGeneration = 0
 
     private static let imageContext = CIContext()
 
@@ -243,6 +244,7 @@ struct MaxPlayerView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: coverSide, height: coverSide)
                         .accessibilityLabel("Обложка текущего альбома")
+                        .id(audio.currentTrack?.id)
                         .transition(.opacity)
                 } else {
                     VStack(spacing: 12) {
@@ -639,28 +641,37 @@ struct MaxPlayerView: View {
     // MARK: - Playlist durations and metadata
 
     private func loadPlaylistDurations() {
+        durationLoadGeneration += 1
+        let generation = durationLoadGeneration
         let tracks = audio.playlist
 
         Task {
-            var loaded: [URL: TimeInterval] = [:]
-            var total: TimeInterval = 0
+            let result = await Task.detached(priority: .utility) {
+                () -> ([URL: TimeInterval], TimeInterval) in
 
-            for track in tracks {
-                do {
-                    let file = try AVAudioFile(forReading: track.url)
-                    let sampleRate = file.processingFormat.sampleRate
-                    guard sampleRate > 0 else { continue }
+                var loaded: [URL: TimeInterval] = [:]
+                var total: TimeInterval = 0
 
-                    let duration = Double(file.length) / sampleRate
-                    loaded[track.url] = duration
-                    total += duration
-                } catch {
-                    continue
+                for track in tracks {
+                    do {
+                        let file = try AVAudioFile(forReading: track.url)
+                        let sampleRate = file.processingFormat.sampleRate
+                        guard sampleRate > 0 else { continue }
+
+                        let duration = Double(file.length) / sampleRate
+                        loaded[track.url] = duration
+                        total += duration
+                    } catch {
+                        continue
+                    }
                 }
-            }
 
-            trackDurations = loaded
-            playlistTotalDuration = total
+                return (loaded, total)
+            }.value
+
+            guard generation == durationLoadGeneration else { return }
+            trackDurations = result.0
+            playlistTotalDuration = result.1
         }
     }
 
