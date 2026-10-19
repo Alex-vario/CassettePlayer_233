@@ -58,7 +58,7 @@ struct MiniPlayerView: View {
 
             HStack(spacing: 5) {
                 compactMeters
-                    .frame(width: 82)
+                    .frame(width: 123)
 
                 verticalDivider
 
@@ -216,7 +216,7 @@ private struct MiniMeterBar: View {
     let level: Float
     let green: Color
 
-    private let segmentCount = 10
+    private let segmentCount = 8
 
     var body: some View {
         HStack(spacing: 3) {
@@ -238,10 +238,10 @@ private struct MiniMeterBar: View {
                         .opacity(isActive ? 0.95 : 0.13)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 8)
+                .frame(height: 9)
             }
         }
-        .frame(height: 10)
+        .frame(height: 11)
         .padding(.horizontal, 3)
         .background(Color.black.opacity(0.75))
         .overlay {
