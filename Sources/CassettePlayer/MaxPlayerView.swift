@@ -90,7 +90,7 @@ struct MaxPlayerView: View {
     @State private var playlistTotalDuration: TimeInterval = 0
     @State private var durationLoadGeneration = 0
 
-    nonisolated(unsafe) private static let imageContext = CIContext()
+    private nonisolated(unsafe) static let imageContext = CIContext()
 
     var body: some View {
         GeometryReader { geometry in
@@ -226,7 +226,7 @@ struct MaxPlayerView: View {
     /// Decodes the crisp cover at its original resolution, but downsamples the
     /// background copy before blurring it. A 1600 px maximum is ample for a
     /// fullscreen backdrop and greatly reduces Core Image work and memory use.
-    nonisolated private static func prepareArtworkImages(from data: Data) -> (original: CGImage?, blurred: CGImage?) {
+    private nonisolated static func prepareArtworkImages(from data: Data) -> (original: CGImage?, blurred: CGImage?) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return (nil, nil)
         }
@@ -262,7 +262,7 @@ struct MaxPlayerView: View {
         return (original, makeBlurredBackground(from: thumbnail))
     }
 
-    nonisolated private static func makeBlurredBackground(from image: CGImage) -> CGImage? {
+    private nonisolated static func makeBlurredBackground(from image: CGImage) -> CGImage? {
         let source = CIImage(cgImage: image)
         let blurred = source
             .clampedToExtent()
