@@ -154,7 +154,6 @@ struct MiniPlayerView: View {
                 .blur(radius: 20)
                 .allowsHitTesting(false)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 
     private var compactMeters: some View {
