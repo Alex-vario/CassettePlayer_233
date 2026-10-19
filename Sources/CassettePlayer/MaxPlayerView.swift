@@ -81,6 +81,7 @@ struct MaxPlayerView: View {
     @State private var blurredBackgroundImage: NSImage?
     @State private var artworkGeneration = 0
     @State private var artworkTask: Task<Void, Never>?
+    @State private var artworkProcessingTask: Task<(original: CGImage?, blurred: CGImage?), Never>?
 
     @State private var isSeeking = false
     @State private var seekTime: TimeInterval = 0
@@ -186,6 +187,7 @@ struct MaxPlayerView: View {
         artworkGeneration += 1
         let generation = artworkGeneration
         artworkTask?.cancel()
+        artworkProcessingTask?.cancel()
 
         guard let artworkData = audio.currentTrack?.artwork else {
             withAnimation(.easeInOut(duration: 0.65)) {
@@ -197,10 +199,13 @@ struct MaxPlayerView: View {
 
         // Image decoding and blur rasterization can be expensive for large embedded
         // covers, so keep that work off the main thread.
+        let processingTask = Task.detached(priority: .userInitiated) {
+            Self.prepareArtworkImages(from: artworkData)
+        }
+        artworkProcessingTask = processingTask
+
         artworkTask = Task {
-            let preparedImages = await Task.detached(priority: .userInitiated) {
-                Self.prepareArtworkImages(from: artworkData)
-            }.value
+            let preparedImages = await processingTask.value
 
             guard !Task.isCancelled, generation == artworkGeneration else { return }
 
