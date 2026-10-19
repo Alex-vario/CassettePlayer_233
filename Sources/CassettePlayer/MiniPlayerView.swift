@@ -216,7 +216,7 @@ private struct MiniMeterBar: View {
     let level: Float
     let green: Color
 
-    private let segmentCount = 9
+    private let segmentCount = 14
 
     var body: some View {
         HStack(spacing: 3) {
@@ -224,7 +224,7 @@ private struct MiniMeterBar: View {
                 let isActive = index < Int(
                     min(1, max(0, level)) * Float(segmentCount)
                 )
-                let color = index >= segmentCount - 1
+                let color = index >= 10
                     ? Color(red: 0.92, green: 0.24, blue: 0.035)
                     : green
 
