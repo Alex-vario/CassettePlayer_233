@@ -11,6 +11,10 @@ final class WindowGeometryManager: ObservableObject {
     private weak var window: NSWindow?
     private var observers: [NSObjectProtocol] = []
     private var mode: Mode = .main
+    private var originalStyleMask: NSWindow.StyleMask?
+    private var originalTitleVisibility: NSWindow.TitleVisibility = .visible
+    private var originalTitlebarAppearsTransparent = false
+    private var originalMovableByWindowBackground = false
 
     private let mainFrameKey = "CassettePlayer.MainWindow.Frame"
     private let miniFrameKey = "CassettePlayer.MiniPlayer.Frame"
@@ -27,6 +31,10 @@ final class WindowGeometryManager: ObservableObject {
         removeObservers()
         self.window = window
         mode = .main
+        originalStyleMask = window.styleMask
+        originalTitleVisibility = window.titleVisibility
+        originalTitlebarAppearsTransparent = window.titlebarAppearsTransparent
+        originalMovableByWindowBackground = window.isMovableByWindowBackground
 
         for name in [
             NSWindow.didMoveNotification,
@@ -70,7 +78,7 @@ final class WindowGeometryManager: ObservableObject {
         mode = targetMode
 
         let targetSize = toMini
-            ? NSSize(width: 520, height: 54)
+            ? NSSize(width: 520, height: 75)
             : NSSize(width: 1024, height: 283)
 
         if let savedFrame = storedFrame(for: targetMode),
@@ -99,6 +107,7 @@ final class WindowGeometryManager: ObservableObject {
             window.setFrame(targetFrame, display: true, animate: true)
         }
 
+        applyMiniTitlebarMode(isMini: toMini)
         applyWindowLevel(alwaysOnTop: alwaysOnTop)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -108,6 +117,26 @@ final class WindowGeometryManager: ObservableObject {
 
     func setAlwaysOnTop(_ enabled: Bool) {
         applyWindowLevel(alwaysOnTop: enabled)
+    }
+
+    private func applyMiniTitlebarMode(isMini: Bool) {
+        guard let window else { return }
+
+        if isMini {
+            // Remove the native title bar and its traffic-light buttons only in Mini Player.
+            // The original style is restored when returning to the main player.
+            window.styleMask.remove(.titled)
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.isMovableByWindowBackground = true
+        } else {
+            if let originalStyleMask {
+                window.styleMask = originalStyleMask
+            }
+            window.titleVisibility = originalTitleVisibility
+            window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent
+            window.isMovableByWindowBackground = originalMovableByWindowBackground
+        }
     }
 
     private func isSameMode(_ other: Mode) -> Bool {
