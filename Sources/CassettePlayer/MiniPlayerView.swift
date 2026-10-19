@@ -15,7 +15,7 @@ struct MiniPlayerView: View {
     )
 
     private let panelWidth: CGFloat = 520
-    private let panelHeight: CGFloat = 54
+    private let panelHeight: CGFloat = 75
 
     private var artistName: String {
         guard let track = audio.currentTrack else {
