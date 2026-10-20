@@ -174,11 +174,11 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
                   let token = result["token"] else {
                 let serverMessage = (try? JSONSerialization.jsonObject(with: data) as? [String: String])?["error"]
                 if statusCode == 401 {
-                    errorMessage = "Маяк отклонил код (HTTP 401: \\(serverMessage ?? "unauthorized")). Убедитесь, что код взят из меню именно запущенного сейчас Маяка."
+                    errorMessage = "Маяк отклонил код (HTTP 401: \(serverMessage ?? "unauthorized")). Убедитесь, что код взят из меню именно запущенного сейчас Маяка."
                 } else if statusCode == -1 {
                     errorMessage = "Ответ Маяка не распознан. Проверьте IP-адрес и подключение к одной Wi-Fi-сети."
                 } else {
-                    errorMessage = "Ошибка подключения к Маяку: HTTP \\(statusCode) \\(serverMessage ?? "")."
+                    errorMessage = "Ошибка подключения к Маяку: HTTP \(statusCode) \(serverMessage ?? "")."
                 }
                 return
             }
