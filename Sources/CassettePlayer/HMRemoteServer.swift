@@ -22,7 +22,7 @@ final class HMRemoteServer: NSObject {
             accessToken = saved
         } else {
             let generated = UUID().uuidString
-            UserDefaults.standard.set(generated, forKey: tokenDefaultsKey)
+            UserDefaults.standard.set(generated, forKey: Self.tokenDefaultsKey)
             accessToken = generated
         }
         super.init()
