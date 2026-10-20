@@ -13,6 +13,7 @@ final class HMRemoteServer: NSObject {
     private let pairingCode = String(format: "%06d", Int.random(in: 0...999_999))
     private let accessToken: String
     private var statusItem: NSStatusItem?
+    private var statusMessageItem: NSMenuItem?
 
     private static let tokenDefaultsKey = "HMRemote.AccessToken"
 
@@ -37,19 +38,19 @@ final class HMRemoteServer: NSObject {
             newListener.newConnectionHandler = { [weak self] connection in
                 self?.handle(connection)
             }
+            // Keep the menu visible even if the listener fails, so the failure is diagnosable.
+            installStatusItem()
             newListener.stateUpdateHandler = { [weak self] state in
                 guard let self else { return }
                 switch state {
                 case .ready:
-                    self.installStatusItem()
+                    self.updateStatusMessage("Сервер запущен · порт \(self.port.rawValue)")
                     NSLog("HM Remote API is listening on port %d.", Int(self.port.rawValue))
                 case .failed(let error):
+                    self.updateStatusMessage("Ошибка сервера: \(error.localizedDescription)")
                     NSLog("HM Remote server failed to start: %@", error.localizedDescription)
-                    // Do not display a pairing code if this instance does not own the port.
-                    if let statusItem = self.statusItem {
-                        NSStatusBar.system.removeStatusItem(statusItem)
-                        self.statusItem = nil
-                    }
+                case .cancelled:
+                    self.updateStatusMessage("Сервер остановлен")
                 default:
                     break
                 }
@@ -76,6 +77,11 @@ final class HMRemoteServer: NSObject {
         let portItem = NSMenuItem(title: "Порт: \(port.rawValue)", action: nil, keyEquivalent: "")
         portItem.isEnabled = false
         menu.addItem(portItem)
+
+        let statusMessage = NSMenuItem(title: "Запуск сервера…", action: nil, keyEquivalent: "")
+        statusMessage.isEnabled = false
+        menu.addItem(statusMessage)
+        statusMessageItem = statusMessage
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(title: "Закрыть HM Remote API", action: #selector(stopFromMenu), keyEquivalent: "")
@@ -83,6 +89,10 @@ final class HMRemoteServer: NSObject {
         menu.addItem(quitItem)
         item.menu = menu
         statusItem = item
+    }
+
+    private func updateStatusMessage(_ message: String) {
+        statusMessageItem?.title = message
     }
 
     @objc private func stopFromMenu() {
