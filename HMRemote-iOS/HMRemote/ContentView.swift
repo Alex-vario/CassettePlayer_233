@@ -24,6 +24,7 @@ struct RemotePlaybackState: Decodable {
     let isPlaying: Bool
     let currentTime: Double
     let duration: Double
+    let volume: Double
     let hasArtwork: Bool
 }
 
@@ -39,6 +40,8 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
     @Published var manualHost = ""
     @Published var displayTime: Double = 0
     @Published var isSeeking = false
+    @Published var volume: Double = 1
+    @Published var isAdjustingVolume = false
     @Published var errorMessage: String?
 
     private let browser = NetServiceBrowser()
@@ -231,6 +234,9 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
             }
             let state = try JSONDecoder().decode(RemotePlaybackState.self, from: data)
             playback = state
+            if !isAdjustingVolume {
+                volume = min(1, max(0, state.volume))
+            }
             if !isSeeking {
                 displayTime = min(max(0, state.currentTime), max(0, state.duration))
             }
@@ -261,11 +267,12 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
         }
     }
 
-    func sendCommand(_ command: String, seconds: Double? = nil) async {
+    func sendCommand(_ command: String, seconds: Double? = nil, volume: Double? = nil) async {
         guard let url = baseURL?.appendingPathComponent("api/command"),
               let accessToken else { return }
         var payload: [String: Any] = ["command": command]
         if let seconds { payload["seconds"] = seconds }
+        if let volume { payload["volume"] = min(1, max(0, volume)) }
 
         do {
             var request = URLRequest(url: url)
@@ -288,6 +295,11 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
     func seekToDisplayTime() async {
         isSeeking = false
         await sendCommand("seek", seconds: displayTime)
+    }
+
+    func setRemoteVolume() async {
+        isAdjustingVolume = false
+        await sendCommand("setVolume", volume: volume)
     }
 
     func formattedTime(_ value: Double) -> String {
@@ -565,6 +577,29 @@ struct ContentView: View {
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.55))
             }
+
+            HStack(spacing: 12) {
+                Image(systemName: model.volume == 0 ? "speaker.slash.fill" : "speaker.fill")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .frame(width: 20)
+                Slider(
+                    value: $model.volume,
+                    in: 0...1,
+                    onEditingChanged: { editing in
+                        model.isAdjustingVolume = editing
+                        if !editing {
+                            Task { await model.setRemoteVolume() }
+                        }
+                    }
+                )
+                .tint(.white)
+                Text("\(Int((model.volume * 100).rounded()))%")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.65))
+                    .frame(width: 36, alignment: .trailing)
+            }
+            .padding(.top, 2)
 
             HStack(spacing: 38) {
                 transportButton("backward.end.fill", size: 27) {
