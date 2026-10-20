@@ -9,7 +9,7 @@ final class HMRemoteServer: NSObject {
     private weak var audio: AudioPlayer?
     private var listener: NWListener?
     private let queue = DispatchQueue.main
-    private let port: NWEndpoint.Port = 8765
+    private let port: NWEndpoint.Port = 8766
     private let pairingCode = String(format: "%06d", Int.random(in: 0...999_999))
     private let accessToken: String
     private var statusItem: NSStatusItem?
