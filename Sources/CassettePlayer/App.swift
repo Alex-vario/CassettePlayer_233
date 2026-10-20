@@ -27,10 +27,10 @@ struct CassettePlayerApp: App {
                 audioPlayer: audioPlayer
             )
 
-        mediaKeys.start()
-
         let server = HMRemoteServer(audio: audioPlayer)
         remoteServer = server
+
+        mediaKeys.start()
         server.start()
     }
 
