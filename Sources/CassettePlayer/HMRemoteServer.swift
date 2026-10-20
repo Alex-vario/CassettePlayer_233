@@ -14,11 +14,11 @@ final class HMRemoteServer: NSObject {
     private let accessToken: String
     private var statusItem: NSStatusItem?
 
-    private let tokenDefaultsKey = "HMRemote.AccessToken"
+    private static let tokenDefaultsKey = "HMRemote.AccessToken"
 
     init(audio: AudioPlayer) {
         self.audio = audio
-        if let saved = UserDefaults.standard.string(forKey: tokenDefaultsKey), !saved.isEmpty {
+        if let saved = UserDefaults.standard.string(forKey: Self.tokenDefaultsKey), !saved.isEmpty {
             accessToken = saved
         } else {
             let generated = UUID().uuidString
