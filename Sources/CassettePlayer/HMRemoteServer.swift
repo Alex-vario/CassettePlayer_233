@@ -37,15 +37,25 @@ final class HMRemoteServer: NSObject {
             newListener.newConnectionHandler = { [weak self] connection in
                 self?.handle(connection)
             }
-            newListener.stateUpdateHandler = { state in
-                if case .failed(let error) = state {
-                    NSLog("HM Remote server failed: %@", error.localizedDescription)
+            newListener.stateUpdateHandler = { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .ready:
+                    self.installStatusItem()
+                    NSLog("HM Remote API is listening on port %d.", Int(self.port.rawValue))
+                case .failed(let error):
+                    NSLog("HM Remote server failed to start: %@", error.localizedDescription)
+                    // Do not display a pairing code if this instance does not own the port.
+                    if let statusItem = self.statusItem {
+                        NSStatusBar.system.removeStatusItem(statusItem)
+                        self.statusItem = nil
+                    }
+                default:
+                    break
                 }
             }
             listener = newListener
-            installStatusItem()
             newListener.start(queue: queue)
-            NSLog("HM Remote API listening on port %d. Pairing code: %@", Int(port.rawValue), pairingCode)
         } catch {
             NSLog("Cannot start HM Remote API: %@", error.localizedDescription)
         }
