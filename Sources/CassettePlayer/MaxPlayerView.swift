@@ -190,7 +190,7 @@ struct MaxPlayerView: View {
         artworkTask?.cancel()
         artworkProcessingTask?.cancel()
 
-        guard let artworkData = audio.currentTrack?.artwork else {
+        guard audio.currentTrack != nil else {
             withAnimation(.easeInOut(duration: 0.95)) {
                 coverImage = nil
                 blurredBackgroundImage = nil
@@ -199,10 +199,15 @@ struct MaxPlayerView: View {
             return
         }
 
-        // Image decoding and blur rasterization can be expensive for large embedded
-        // covers, so keep that work off the main thread.
+        let artworkData = audio.currentTrack?.artwork
+
+        // Decode either the embedded cover or the bundled app-logo placeholder
+        // off the main thread. Tracks with artwork keep their original image.
         let processingTask = Task.detached(priority: .userInitiated) {
-            Self.prepareArtworkImages(from: artworkData)
+            if let artworkData {
+                return Self.prepareArtworkImages(from: artworkData)
+            }
+            return Self.preparePlaceholderArtworkImages()
         }
         artworkProcessingTask = processingTask
 
@@ -229,6 +234,23 @@ struct MaxPlayerView: View {
     /// Decodes the crisp cover at its original resolution, but downsamples the
     /// background copy before blurring it. A 600 px maximum is sufficient for
     /// the heavily blurred fullscreen backdrop and minimizes Core Image work.
+    /// Loads the bundled app logo as artwork for tracks without embedded covers.
+    /// Called from the detached processing task so file I/O and image decoding stay
+    /// off the main thread.
+    private nonisolated static func preparePlaceholderArtworkImages() -> (original: CGImage?, blurred: CGImage?) {
+        guard
+            let url = Bundle.module.url(
+                forResource: "CassettePlayerPlaceholder",
+                withExtension: "png"
+            ),
+            let data = try? Data(contentsOf: url)
+        else {
+            return (nil, nil)
+        }
+
+        return prepareArtworkImages(from: data)
+    }
+
     private nonisolated static func prepareArtworkImages(from data: Data) -> (original: CGImage?, blurred: CGImage?) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return (nil, nil)
