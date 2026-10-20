@@ -10,6 +10,7 @@ struct CassettePlayerApp: App {
     @StateObject private var audio: AudioPlayer
 
     private let mediaKeys: MediaKeyManager
+    private let remoteServer: HMRemoteServer
 
     init() {
 
@@ -27,6 +28,10 @@ struct CassettePlayerApp: App {
             )
 
         mediaKeys.start()
+
+        let server = HMRemoteServer(audio: audioPlayer)
+        remoteServer = server
+        server.start()
     }
 
     var body: some Scene {
