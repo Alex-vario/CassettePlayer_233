@@ -77,11 +77,11 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
             .replacingOccurrences(of: "http://", with: "")
             .replacingOccurrences(of: "https://", with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !host.isEmpty, !host.contains("/"), !host.contains(":"), let url = URL(string: "http://\(host):8765") else {
+        guard !host.isEmpty, !host.contains("/"), !host.contains(":"), let url = URL(string: "http://\(host):8766") else {
             errorMessage = "Введите IP-адрес Mac, например 192.168.0.227."
             return
         }
-        let device = RemoteDevice(id: "manual-\(host)", name: "Mayak-233", host: host, port: 8765)
+        let device = RemoteDevice(id: "manual-\(host)", name: "Mayak-233", host: host, port: 8766)
         selectedDevice = device
         baseURL = url
         errorMessage = nil
