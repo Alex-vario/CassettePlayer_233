@@ -78,6 +78,14 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
     <key>NSHighResolutionCapable</key>
     <true/>
 
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>HM Remote позволяет управлять воспроизведением CassettePlayer с iPhone в локальной сети.</string>
+
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_hmremote._tcp</string>
+    </array>
+
 </dict>
 </plist>
 EOF
