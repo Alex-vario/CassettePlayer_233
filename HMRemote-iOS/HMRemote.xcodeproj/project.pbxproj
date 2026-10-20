@@ -78,7 +78,7 @@
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		A100000A000000000000000001 /* Project object */ = {
+		A100000A0000000000000001 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
@@ -89,7 +89,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A100000B000000000000000001 /* Build configuration list for PBXProject "HM Remote" */;
+			buildConfigurationList = A100000B0000000000000001 /* Build configuration list for PBXProject "HM Remote" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -130,7 +130,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		A100000C000000000000000001 /* Debug */ = {
+		A100000C0000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -147,7 +147,7 @@
 			};
 			name = Debug;
 		};
-		A100000C000000000000000002 /* Release */ = {
+		A100000C0000000000000002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -170,22 +170,22 @@
 		A10000070000000000000001 /* Build configuration list for PBXNativeTarget "HM Remote" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A100000C000000000000000001 /* Debug */,
-				A100000C000000000000000002 /* Release */,
+				A100000C0000000000000001 /* Debug */,
+				A100000C0000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A100000B000000000000000001 /* Build configuration list for PBXProject "HM Remote" */ = {
+		A100000B0000000000000001 /* Build configuration list for PBXProject "HM Remote" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A100000C000000000000000003 /* Debug */,
-				A100000C000000000000000004 /* Release */,
+				A100000C0000000000000003 /* Debug */,
+				A100000C0000000000000004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 1;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = A100000A000000000000000001 /* Project object */;
+	rootObject = A100000A0000000000000001 /* Project object */;
 }
