@@ -48,3 +48,5 @@ CassettePlayer now starts a local control API for the planned **HM Remote** iPho
 - Authenticated requests use `Authorization: Bearer <token>`.
 
 The pairing code changes each time CassettePlayer starts. The paired access token is stored in the Mac user's preferences. Keep HM Remote on a trusted local network; the API is intended for local-network use only.
+
+The companion iOS project is in `HMRemote-iOS/HMRemote.xcodeproj`. Open it in Xcode, select the **HM Remote** target, choose your iPhone and Apple development team, then build and run. On first launch, allow local-network access, select **Mayak-233**, and enter the six-digit code shown in the Mac menu bar. The iOS target is an initial implementation and still needs a real-device build and end-to-end test.
