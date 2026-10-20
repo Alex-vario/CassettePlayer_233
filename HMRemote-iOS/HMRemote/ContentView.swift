@@ -36,6 +36,7 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
     @Published private(set) var isPairing = false
     @Published private(set) var isBusy = false
     @Published var pairingCode = ""
+    @Published var manualHost = ""
     @Published var displayTime: Double = 0
     @Published var isSeeking = false
     @Published var errorMessage: String?
@@ -61,6 +62,35 @@ final class HMRemoteModel: NSObject, ObservableObject, NetServiceBrowserDelegate
         guard !isBrowsing else { return }
         isBrowsing = true
         browser.searchForServices(ofType: "_hmremote._tcp.", inDomain: "local.")
+    }
+
+    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) {
+        errorMessage = "Поиск Маяка через Bonjour не удался. Можно подключиться по IP-адресу Mac."
+    }
+
+    func netServiceBrowserDidStopSearch(_ browser: NetServiceBrowser) {
+        isBrowsing = false
+    }
+
+    func connectManually() {
+        let host = manualHost.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "http://", with: "")
+            .replacingOccurrences(of: "https://", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !host.isEmpty, !host.contains("/"), !host.contains(":"), let url = URL(string: "http://\(host):8765") else {
+            errorMessage = "Введите IP-адрес Mac, например 192.168.0.227."
+            return
+        }
+        let device = RemoteDevice(id: "manual-\(host)", name: "Mayak-233", host: host, port: 8765)
+        selectedDevice = device
+        baseURL = url
+        errorMessage = nil
+        pairingCode = ""
+        accessToken = Keychain.read(account: host)
+        isPairing = accessToken == nil
+        if !isPairing {
+            Task { await refresh() }
+        }
     }
 
     func stopBrowsing() {
@@ -366,6 +396,28 @@ struct ContentView: View {
                     }
                 }
             }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Если Маяк не найден")
+                    .font(.headline)
+                Text("Узнайте IP-адрес Mac в настройках Wi-Fi и введите его ниже.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                HStack(spacing: 10) {
+                    TextField("IP-адрес Mac, например 192.168.0.227", text: $model.manualHost)
+                        .keyboardType(.decimalPad)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(13)
+                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    Button("Подключить") {
+                        model.connectManually()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(14)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
             if let error = model.errorMessage {
                 Text(error).font(.footnote).foregroundStyle(.red.opacity(0.9)).multilineTextAlignment(.center)
             }
