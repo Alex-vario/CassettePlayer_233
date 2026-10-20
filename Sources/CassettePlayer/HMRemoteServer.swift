@@ -221,6 +221,7 @@ final class HMRemoteServer: NSObject {
             "isPlaying": audio?.isPlaying ?? false,
             "currentTime": audio?.currentTime ?? 0,
             "duration": audio?.duration ?? 0,
+            "volume": Double(audio?.volume ?? 1.0),
             "hasArtwork": track?.artwork != nil
         ]
     }
@@ -248,6 +249,12 @@ final class HMRemoteServer: NSObject {
                 return
             }
             audio.seek(to: seconds)
+        case "setVolume":
+            guard let value = json["volume"] as? Double, value.isFinite else {
+                sendJSON(["error": "missing_volume"], status: 400, on: connection)
+                return
+            }
+            audio.setVolume(Float(min(1, max(0, value))))
         default:
             sendJSON(["error": "unknown_command"], status: 400, on: connection)
             return
