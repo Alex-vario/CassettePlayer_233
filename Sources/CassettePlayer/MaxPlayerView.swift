@@ -231,9 +231,6 @@ struct MaxPlayerView: View {
         }
     }
 
-    /// Decodes the crisp cover at its original resolution, but downsamples the
-    /// background copy before blurring it. A 600 px maximum is sufficient for
-    /// the heavily blurred fullscreen backdrop and minimizes Core Image work.
     /// Loads the bundled app logo as artwork for tracks without embedded covers.
     /// Called from the detached processing task so file I/O and image decoding stay
     /// off the main thread.
@@ -251,6 +248,9 @@ struct MaxPlayerView: View {
         return prepareArtworkImages(from: data)
     }
 
+    /// Decodes the crisp cover at its original resolution, but downsamples the
+    /// background copy before blurring it. A 600 px maximum is sufficient for
+    /// the heavily blurred fullscreen backdrop and minimizes Core Image work.
     private nonisolated static func prepareArtworkImages(from data: Data) -> (original: CGImage?, blurred: CGImage?) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return (nil, nil)
