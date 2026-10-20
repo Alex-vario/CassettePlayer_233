@@ -16,7 +16,7 @@ struct RemoteDevice: Identifiable, Hashable {
     }
 }
 
-private struct RemotePlaybackState: Decodable {
+struct RemotePlaybackState: Decodable {
     let device: String
     let title: String
     let artist: String
