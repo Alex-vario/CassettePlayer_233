@@ -34,3 +34,17 @@
 ## Перенос на другой Mac
 
 Приложение можно скопировать на другой Mac, но локальные разрешения конфиденциальности и сохранённые настройки туда не переносятся. Из-за ad hoc подписи macOS может показать предупреждение при первом запуске. Для использования медиаклавиш на новом Mac нужно отдельно разрешить мониторинг ввода и Универсальный доступ. Для регулярного распространения приложения потребуется Developer ID подпись и нотарификация Apple.
+
+## HM Remote (iPhone companion)
+
+CassettePlayer now starts a local control API for the planned **HM Remote** iPhone app. Audio continues to play on the Mac; the phone only controls playback and reads track information.
+
+- Bonjour service: `_hmremote._tcp`, advertised as `Mayak-233`
+- HTTP port: `8765`
+- `POST /api/pair` with JSON `{"code":"123456"}` returns an access token. The temporary six-digit pairing code is shown in the Mac menu bar under **HM Remote**.
+- Authenticated `GET /api/state` returns the current track, artist, album, playback state, elapsed time and duration.
+- Authenticated `GET /api/artwork` returns embedded artwork or the app's placeholder logo.
+- Authenticated `POST /api/command` accepts `{"command":"playPause"}`, `{"command":"next"}`, `{"command":"previous"}`, or `{"command":"seek","seconds":42.5}`.
+- Authenticated requests use `Authorization: Bearer <token>`.
+
+The pairing code changes each time CassettePlayer starts. The paired access token is stored in the Mac user's preferences. Keep HM Remote on a trusted local network; the API is intended for local-network use only.
