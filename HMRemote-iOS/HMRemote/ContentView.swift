@@ -3,6 +3,7 @@ import UIKit
 import Foundation
 import Combine
 import Network
+import Security
 
 struct RemoteDevice: Identifiable, Hashable {
     let id: String
