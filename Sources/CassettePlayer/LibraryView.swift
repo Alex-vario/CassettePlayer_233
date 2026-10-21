@@ -961,7 +961,7 @@ struct LibraryView: View {
 
             guard !Task.isCancelled else { return }
 
-            let results = await Task.detached(priority: .userInitiated) {
+            let results = await Task.detached(priority: .userInitiated) { () -> ([URL], [ArtistGroup], [AudioTrack]) in
                 var folderMatches: [URL] = []
                 var artistMatches: [ArtistGroup] = []
                 var trackMatches: [AudioTrack] = []
