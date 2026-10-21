@@ -372,7 +372,7 @@ struct PlaylistView: View {
 
 // MARK: - Track row
 
-private private struct FolderPlaylistHeader: View {
+private struct FolderPlaylistHeader: View {
     let title: String
 
     var body: some View {
