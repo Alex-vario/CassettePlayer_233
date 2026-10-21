@@ -186,6 +186,14 @@ struct PlaylistView: View {
                         Array(audio.playlist.enumerated()),
                         id: \.element.id
                     ) { index, track in
+                        let folderName = track.url.deletingLastPathComponent().lastPathComponent
+                        let previousFolderName = index > 0
+                            ? audio.playlist[index - 1].url.deletingLastPathComponent().lastPathComponent
+                            : nil
+
+                        if index == 0 || folderName != previousFolderName {
+                            FolderPlaylistHeader(title: folderName)
+                        }
 
                         PlaylistTrackRow(
                             number: index + 1,
@@ -364,7 +372,34 @@ struct PlaylistView: View {
 
 // MARK: - Track row
 
-private struct PlaylistTrackRow: View {
+private private struct FolderPlaylistHeader: View {
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "folder")
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.48))
+            Text(title.isEmpty ? "Без названия" : title)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.78))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 3)
+        .padding(.top, 7)
+        .padding(.bottom, 3)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.white.opacity(0.10))
+                .frame(height: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct PlaylistTrackRow: View {
 
     let number: Int
     let track: AudioTrack
