@@ -1696,7 +1696,7 @@ struct LibraryView: View {
         }
 
         isLoading = true
-        isSearchIndexLoading = !normalizedFilterQuery.isEmpty
+        isSearchIndexLoading = normalizedFilterQuery.count >= 2
 
         Task {
             let index = await LibraryIndexStore.shared.load(root: root, forceRefresh: true)
