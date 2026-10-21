@@ -113,12 +113,92 @@ struct AudioTrack: Identifiable, Hashable {
             // Metadata is optional; the track remains playable without it.
         }
 
-        if track.artwork == nil,
-           url.pathExtension.lowercased() == "flac" {
-            track.artwork = readFLACArtwork(from: url)
+        if url.pathExtension.lowercased() == "flac" {
+            // AVFoundation does not consistently expose FLAC Vorbis comments
+            // as common metadata, so read the tags directly as a fallback.
+            let tags = readFLACVorbisComments(from: url)
+            if track.artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                track.artist = tags["artist"] ?? tags["album_artist"] ?? ""
+            }
+            if track.taggedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                track.taggedTitle = tags["title"] ?? ""
+            }
+            if track.album.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                track.album = tags["album"] ?? ""
+            }
+            if track.artwork == nil {
+                track.artwork = readFLACArtwork(from: url)
+            }
         }
 
         return track
+    }
+
+    /// Reads FLAC Vorbis comments (artist/title/album) directly from the metadata blocks.
+    /// This is needed because AVFoundation may omit these tags for FLAC files.
+    private static func readFLACVorbisComments(from url: URL) -> [String: String] {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return [:] }
+        defer { try? handle.close() }
+
+        guard let signature = try? handle.read(upToCount: 4),
+              signature == Data("fLaC".utf8) else { return [:] }
+
+        func readUInt32LE(_ data: Data, at offset: inout Int) -> UInt32? {
+            guard offset + 4 <= data.count else { return nil }
+            let bytes = [UInt8](data[offset..<(offset + 4)])
+            offset += 4
+            return UInt32(bytes[0])
+                | (UInt32(bytes[1]) << 8)
+                | (UInt32(bytes[2]) << 16)
+                | (UInt32(bytes[3]) << 24)
+        }
+
+        while true {
+            guard let header = try? handle.read(upToCount: 4), header.count == 4 else {
+                return [:]
+            }
+            let bytes = [UInt8](header)
+            let isLastBlock = (bytes[0] & 0x80) != 0
+            let blockType = bytes[0] & 0x7F
+            let blockLength = (Int(bytes[1]) << 16) | (Int(bytes[2]) << 8) | Int(bytes[3])
+
+            if blockLength < 0 || blockLength > 16 * 1024 * 1024 { return [:] }
+
+            if blockType == 4 {
+                guard let block = try? handle.read(upToCount: blockLength),
+                      block.count == blockLength else { return [:] }
+                var offset = 0
+                guard let vendorLength = readUInt32LE(block, at: &offset),
+                      vendorLength <= UInt32(block.count - offset) else { return [:] }
+                offset += Int(vendorLength)
+                guard let count = readUInt32LE(block, at: &offset),
+                      count <= 100_000 else { return [:] }
+
+                var result: [String: String] = [:]
+                for _ in 0..<count {
+                    guard let length = readUInt32LE(block, at: &offset),
+                          length <= UInt32(block.count - offset) else { return result }
+                    let end = offset + Int(length)
+                    let entry = String(decoding: block[offset..<end], as: UTF8.self)
+                    offset = end
+                    guard let separator = entry.firstIndex(of: "=") else { continue }
+                    let key = String(entry[..<separator]).lowercased()
+                    let value = String(entry[entry.index(after: separator)...])
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !value.isEmpty, result[key] == nil {
+                        result[key] = value
+                    }
+                }
+                return result
+            }
+
+            do {
+                try handle.seek(toOffset: handle.offsetInFile + UInt64(blockLength))
+            } catch {
+                return [:]
+            }
+            if isLastBlock { return [:] }
+        }
     }
 
     /// Reads FLAC PICTURE metadata without loading the complete audio file.
