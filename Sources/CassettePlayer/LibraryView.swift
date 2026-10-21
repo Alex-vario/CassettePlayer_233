@@ -961,27 +961,35 @@ struct LibraryView: View {
                             noFilterResults("Исполнители не найдены")
                         } else {
                             searchSectionTitle("ИСПОЛНИТЕЛИ", count: matchingSearchArtists.count)
-                            ForEach(matchingSearchArtists) { artist in
-                                Button {
-                                    libraryFilterText = ""
-                                    playArtist(artist)
-                                } label: {
-                                    HStack(spacing: 9) {
-                                        Image(systemName: "person.fill")
-                                            .foregroundStyle(Color.white.opacity(0.7))
-                                        Text(artist.name)
-                                            .foregroundStyle(Color.white.opacity(0.92))
-                                        Spacer()
-                                        Text("\(artist.tracks.count) тр.")
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .foregroundStyle(Color.white.opacity(0.45))
-                                    }
-                                    .font(.system(size: 12))
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 7)
-                                    .contentShape(Rectangle())
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(
+                                        .adaptive(
+                                            minimum: CGFloat(libraryTileSize),
+                                            maximum: CGFloat(libraryTileSize)
+                                        ),
+                                        spacing: 10
+                                    )
+                                ],
+                                spacing: 10
+                            ) {
+                                ForEach(
+                                    Array(matchingSearchArtists.enumerated()),
+                                    id: \.element.id
+                                ) { index, artist in
+                                    ArtistTile(
+                                        artist: artist,
+                                        artworkRevealDelay: Double(index % 7) * 0.04,
+                                        onOpen: {
+                                            selectedArtist = artist
+                                            libraryFilterText = ""
+                                            libraryMode = 1
+                                        },
+                                        onPlay: {
+                                            playArtist(artist)
+                                        }
+                                    )
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
 
@@ -1008,34 +1016,40 @@ struct LibraryView: View {
                             noFilterResults("Папки не найдены")
                         } else {
                             searchSectionTitle("ПАПКИ", count: matchingSearchFolders.count)
-                            ForEach(matchingSearchFolders, id: \.standardizedFileURL.path) { folder in
-                                Button {
-                                    libraryFilterText = ""
-                                    libraryMode = 0
-                                    selectedArtist = nil
-                                    openFolder(folder)
-                                } label: {
-                                    HStack(spacing: 9) {
-                                        Image(systemName: "folder.fill")
-                                            .foregroundStyle(Color.white.opacity(0.7))
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(folder.lastPathComponent)
-                                                .foregroundStyle(Color.white.opacity(0.92))
-                                            Text(folder.deletingLastPathComponent().lastPathComponent)
-                                                .font(.system(size: 10))
-                                                .foregroundStyle(Color.white.opacity(0.45))
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(
+                                        .adaptive(
+                                            minimum: CGFloat(libraryTileSize),
+                                            maximum: CGFloat(libraryTileSize)
+                                        ),
+                                        spacing: 10
+                                    )
+                                ],
+                                spacing: 10
+                            ) {
+                                ForEach(matchingSearchFolders, id: \.standardizedFileURL.path) { folder in
+                                    FolderTile(
+                                        folderURL: folder,
+                                        artworkData: folderArtworkByPath[folder.standardizedFileURL.path],
+                                        artworkGeneration: folderArtworkGeneration,
+                                        onOpen: {
+                                            libraryFilterText = ""
+                                            libraryMode = 0
+                                            selectedArtist = nil
+                                            openFolder(folder)
+                                        },
+                                        onPlay: {
+                                            Task {
+                                                let tracks = await collectAudioTracks(in: folder)
+                                                guard !tracks.isEmpty else { return }
+                                                audio.setPlaylist(tracks)
+                                                audio.play(tracks[0])
+                                                onClose()
+                                            }
                                         }
-                                        Spacer()
-                                        Image(systemName: "arrow.up.left")
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(Color.white.opacity(0.35))
-                                    }
-                                    .font(.system(size: 12))
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 7)
-                                    .contentShape(Rectangle())
+                                    )
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
