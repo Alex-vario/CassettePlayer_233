@@ -298,6 +298,11 @@ struct LibraryView: View {
     private var libraryFilterText = ""
     @State private var searchFolders: [URL] = []
     @State private var searchTracks: [AudioTrack] = []
+    @State private var filteredSearchFolders: [URL] = []
+    @State private var filteredSearchArtists: [ArtistGroup] = []
+    @State private var filteredSearchTracks: [AudioTrack] = []
+    @State private var searchTask: Task<Void, Never>?
+    @State private var searchGeneration = UUID()
     @State private var folderArtworkByPath: [String: Data] = [:]
     @State private var folderArtworkGeneration = 0
     @State private var isSearchIndexLoading = false
@@ -356,7 +361,8 @@ struct LibraryView: View {
             loadSavedRoot()
         }
         .onChange(of: libraryFilterText) { newValue in
-            if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            scheduleFilterSearch(newValue)
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
                 loadSearchIndexIfNeeded()
             }
         }
@@ -367,6 +373,11 @@ struct LibraryView: View {
             searchIndexRootPath = nil
             searchFolders = []
             searchTracks = []
+            filteredSearchFolders = []
+            filteredSearchArtists = []
+            filteredSearchTracks = []
+            searchTask?.cancel()
+            searchGeneration = UUID()
             folderArtworkByPath = [:]
             folderArtworkGeneration += 1
             LibraryArtworkThumbnailCache.clear()
@@ -914,31 +925,79 @@ struct LibraryView: View {
         libraryFilterText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var matchingSearchFolders: [URL] {
-        guard !normalizedFilterQuery.isEmpty else { return [] }
-        return searchFolders
-            .filter { $0.lastPathComponent.localizedCaseInsensitiveContains(normalizedFilterQuery) }
-            .sorted {
-                $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
-            }
-    }
+    /// Debounce typing and do filtering/sorting away from SwiftUI's main actor.
+    /// Only the newest query is allowed to publish results.
+    private func scheduleFilterSearch(_ rawQuery: String) {
+        let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchTask?.cancel()
+        let generation = UUID()
+        searchGeneration = generation
 
-    private var matchingSearchArtists: [ArtistGroup] {
-        guard !normalizedFilterQuery.isEmpty else { return [] }
-        return artists.filter {
-            $0.name.localizedCaseInsensitiveContains(normalizedFilterQuery)
+        guard query.count >= 2 else {
+            filteredSearchFolders = []
+            filteredSearchArtists = []
+            filteredSearchTracks = []
+            return
         }
-    }
 
-    private var matchingSearchTracks: [AudioTrack] {
-        guard !normalizedFilterQuery.isEmpty else { return [] }
-        return searchTracks
-            .filter {
-                $0.title.localizedCaseInsensitiveContains(normalizedFilterQuery)
+        guard searchIndexRootPath != nil, !isSearchIndexLoading else {
+            filteredSearchFolders = []
+            filteredSearchArtists = []
+            filteredSearchTracks = []
+            return
+        }
+
+        let mode = libraryFilterMode
+        let folders = searchFolders
+        let tracks = searchTracks
+        let artistGroups = artists
+
+        searchTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: 400_000_000)
+            } catch {
+                return
             }
-            .sorted {
-                $0.title.localizedStandardCompare($1.title) == .orderedAscending
-            }
+
+            guard !Task.isCancelled else { return }
+
+            let results = await Task.detached(priority: .userInitiated) {
+                var folderMatches: [URL] = []
+                var artistMatches: [ArtistGroup] = []
+                var trackMatches: [AudioTrack] = []
+
+                switch mode {
+                case "artist":
+                    for artist in artistGroups {
+                        if Task.isCancelled { return ([], [], []) }
+                        if artist.name.localizedCaseInsensitiveContains(query) { artistMatches.append(artist) }
+                    }
+                case "track":
+                    for track in tracks {
+                        if Task.isCancelled { return ([], [], []) }
+                        if track.title.localizedCaseInsensitiveContains(query) { trackMatches.append(track) }
+                    }
+                    trackMatches.sort { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+                default:
+                    for folder in folders {
+                        if Task.isCancelled { return ([], [], []) }
+                        if folder.lastPathComponent.localizedCaseInsensitiveContains(query) { folderMatches.append(folder) }
+                    }
+                    folderMatches.sort { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+                }
+
+                return (folderMatches, artistMatches, trackMatches)
+            }.value
+
+            guard !Task.isCancelled,
+                  searchGeneration == generation,
+                  normalizedFilterQuery == query,
+                  libraryFilterMode == mode else { return }
+
+            filteredSearchFolders = results.0
+            filteredSearchArtists = results.1
+            filteredSearchTracks = results.2
+        }
     }
 
     private var searchResultsContent: some View {
@@ -954,13 +1013,18 @@ struct LibraryView: View {
                         .foregroundStyle(Color.white.opacity(0.6))
                         .frame(maxWidth: .infinity)
                         .padding(.top, 28)
+                } else if normalizedFilterQuery.count < 2 {
+                    Text("Введите минимум 2 символа для поиска")
+                        .foregroundStyle(Color.white.opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 28)
                 } else {
                     switch libraryFilterMode {
                     case "artist":
-                        if matchingSearchArtists.isEmpty {
+                        if filteredSearchArtists.isEmpty {
                             noFilterResults("Исполнители не найдены")
                         } else {
-                            searchSectionTitle("ИСПОЛНИТЕЛИ", count: matchingSearchArtists.count)
+                            searchSectionTitle("ИСПОЛНИТЕЛИ", count: filteredSearchArtists.count)
                             LazyVGrid(
                                 columns: [
                                     GridItem(
@@ -974,7 +1038,7 @@ struct LibraryView: View {
                                 spacing: 10
                             ) {
                                 ForEach(
-                                    Array(matchingSearchArtists.enumerated()),
+                                    Array(filteredSearchArtists.enumerated()),
                                     id: \.element.id
                                 ) { index, artist in
                                     ArtistTile(
@@ -994,16 +1058,16 @@ struct LibraryView: View {
                         }
 
                     case "track":
-                        if matchingSearchTracks.isEmpty {
+                        if filteredSearchTracks.isEmpty {
                             noFilterResults("Треки не найдены")
                         } else {
-                            searchSectionTitle("ТРЕКИ", count: matchingSearchTracks.count)
-                            ForEach(matchingSearchTracks) { track in
+                            searchSectionTitle("ТРЕКИ", count: filteredSearchTracks.count)
+                            ForEach(filteredSearchTracks) { track in
                                 TrackRow(
                                     url: track.url,
                                     isCurrent: audio.currentTrack?.url == track.url,
                                     onPlay: {
-                                        audio.setPlaylist(matchingSearchTracks)
+                                        audio.setPlaylist(filteredSearchTracks)
                                         audio.play(track)
                                         onClose()
                                     }
@@ -1012,10 +1076,10 @@ struct LibraryView: View {
                         }
 
                     default:
-                        if matchingSearchFolders.isEmpty {
+                        if filteredSearchFolders.isEmpty {
                             noFilterResults("Папки не найдены")
                         } else {
-                            searchSectionTitle("ПАПКИ", count: matchingSearchFolders.count)
+                            searchSectionTitle("ПАПКИ", count: filteredSearchFolders.count)
                             LazyVGrid(
                                 columns: [
                                     GridItem(
@@ -1028,7 +1092,7 @@ struct LibraryView: View {
                                 ],
                                 spacing: 10
                             ) {
-                                ForEach(matchingSearchFolders, id: \.standardizedFileURL.path) { folder in
+                                ForEach(filteredSearchFolders, id: \.standardizedFileURL.path) { folder in
                                     FolderTile(
                                         folderURL: folder,
                                         artworkData: folderArtworkByPath[folder.standardizedFileURL.path],
@@ -1146,6 +1210,7 @@ struct LibraryView: View {
                 Self.makeArtistGroups(from: index.tracks)
             }.value
             isSearchIndexLoading = false
+            scheduleFilterSearch(normalizedFilterQuery)
         }
     }
 
@@ -1646,6 +1711,7 @@ struct LibraryView: View {
             artists = await Task.detached(priority: .utility) {
                 Self.makeArtistGroups(from: index.tracks)
             }.value
+            scheduleFilterSearch(normalizedFilterQuery)
 
             let visibleFolder = currentFolder ?? root
             let folderResult = Self.scanFolder(visibleFolder)
