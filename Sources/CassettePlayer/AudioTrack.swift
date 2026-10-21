@@ -13,6 +13,8 @@ struct AudioTrack: Identifiable, Hashable {
     var artist: String
     var taggedTitle: String
     var album: String
+    var trackNumber: Int?
+    var discNumber: Int?
     var bitrate: Int
     var artwork: Data?
 
@@ -78,6 +80,8 @@ struct AudioTrack: Identifiable, Hashable {
         self.artist = ""
         self.taggedTitle = ""
         self.album = ""
+        self.trackNumber = nil
+        self.discNumber = nil
         self.bitrate = 0
         self.artwork = nil
     }
@@ -113,6 +117,24 @@ struct AudioTrack: Identifiable, Hashable {
             // Metadata is optional; the track remains playable without it.
         }
 
+        // Read track/disc numbers from format-specific AVFoundation metadata where available.
+        for format in [AVMetadataFormat.iTunesMetadata, .id3Metadata] {
+            if let items = try? await asset.loadMetadata(for: format) {
+                for item in items {
+                    let key = item.identifier?.rawValue.lowercased() ?? ""
+                    let value = (try? await item.load(.stringValue)) ?? ""
+                    if track.trackNumber == nil,
+                       key.contains("tracknumber") {
+                        track.trackNumber = Self.integerTag(value)
+                    }
+                    if track.discNumber == nil,
+                       key.contains("discnumber") || key.contains("partofaset") {
+                        track.discNumber = Self.integerTag(value)
+                    }
+                }
+            }
+        }
+
         if url.pathExtension.lowercased() == "flac" {
             // AVFoundation does not consistently expose FLAC Vorbis comments
             // as common metadata, so read the tags directly as a fallback.
@@ -126,12 +148,25 @@ struct AudioTrack: Identifiable, Hashable {
             if track.album.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 track.album = tags["album"] ?? ""
             }
+            if track.trackNumber == nil {
+                track.trackNumber = Self.integerTag(tags["tracknumber"] ?? tags["track"])
+            }
+            if track.discNumber == nil {
+                track.discNumber = Self.integerTag(tags["discnumber"] ?? tags["disc"])
+            }
             if track.artwork == nil {
                 track.artwork = readFLACArtwork(from: url)
             }
         }
 
         return track
+    }
+
+    private static func integerTag(_ raw: String?) -> Int? {
+        guard let raw else { return nil }
+        let first = raw.split(separator: "/", maxSplits: 1).first.map(String.init) ?? raw
+        let digits = first.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Int(digits)
     }
 
     /// Reads FLAC Vorbis comments (artist/title/album) directly from the metadata blocks.
