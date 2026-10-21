@@ -591,10 +591,18 @@ struct MaxPlayerView: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(audio.playlist.enumerated()), id: \.element.id) { index, track in
-                            playlistRow(track, index: index)
-                                .id(track.id)
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(playlistAlbumGroups) { group in
+                            MaxPlaylistAlbumHeader(
+                                title: group.title,
+                                count: group.tracks.count,
+                                artworkData: group.tracks.first(where: { $0.artwork != nil })?.artwork
+                            )
+
+                            ForEach(Array(group.tracks.enumerated()), id: \.element.id) { offset, track in
+                                playlistRow(track, index: group.startIndex + offset)
+                                    .id(track.id)
+                            }
                         }
                     }
                     .padding(.horizontal, 8)
@@ -633,6 +641,37 @@ struct MaxPlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+
+    /// Consecutive tracks from the same album (or folder when album tags are absent)
+    /// are grouped for visual orientation only; playback order and track numbering stay intact.
+    private var playlistAlbumGroups: [MaxPlaylistAlbumGroup] {
+        var groups: [MaxPlaylistAlbumGroup] = []
+
+        for (index, track) in audio.playlist.enumerated() {
+            let album = track.album.trimmingCharacters(in: .whitespacesAndNewlines)
+            let folderURL = track.url.deletingLastPathComponent().standardizedFileURL
+            let title = album.isEmpty ? folderURL.lastPathComponent : album
+            let key = album.isEmpty
+                ? "folder:\(folderURL.path)"
+                : "album:\(album.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current))"
+
+            if let lastIndex = groups.indices.last, groups[lastIndex].key == key {
+                groups[lastIndex].tracks.append(track)
+            } else {
+                groups.append(
+                    MaxPlaylistAlbumGroup(
+                        id: "\(key)#\(index)",
+                        key: key,
+                        title: title.isEmpty ? "Без названия" : title,
+                        startIndex: index,
+                        tracks: [track]
+                    )
+                )
+            }
+        }
+
+        return groups
+    }
 
     private func playlistRow(_ track: AudioTrack, index: Int) -> some View {
         let isCurrent = audio.currentTrack?.url == track.url
@@ -752,6 +791,65 @@ struct MaxPlayerView: View {
             return "FLAC · lossless"
         }
         return format.isEmpty ? "AUDIO" : format
+    }
+}
+
+private struct MaxPlaylistAlbumGroup: Identifiable {
+    let id: String
+    let key: String
+    let title: String
+    let startIndex: Int
+    var tracks: [AudioTrack]
+}
+
+private struct MaxPlaylistAlbumHeader: View {
+    let title: String
+    let count: Int
+    let artworkData: Data?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Group {
+                if let artworkData, let image = NSImage(data: artworkData) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(Color.white.opacity(0.07))
+                        Image(systemName: "opticaldisc")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.42))
+                    }
+                }
+            }
+            .frame(width: 38, height: 38)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.88))
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+
+                Text("\(count) \(count == 1 ? "трек" : (count < 5 ? "трека" : "треков"))")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.48))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 9)
+        .padding(.bottom, 5)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.white.opacity(0.10))
+                .frame(height: 1)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
