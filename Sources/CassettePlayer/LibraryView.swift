@@ -1337,23 +1337,48 @@ struct LibraryView: View {
                 )
             }
 
-            ForEach(
-                artist.tracks
-            ) { track in
-
-                TrackRow(
-                    url: track.url,
-                    isCurrent:
-                        audio.currentTrack?.url == track.url,
-                    onPlay: {
-                        playArtistFile(
-                            track,
-                            artist: artist
-                        )
-                    }
+            ForEach(albumDisplayGroups(for: artist.tracks)) { group in
+                AlbumPlaylistSectionHeader(
+                    title: group.title,
+                    count: group.tracks.count,
+                    artworkData: group.tracks.first(where: { $0.artwork != nil })?.artwork
                 )
+
+                ForEach(group.tracks) { track in
+                    TrackRow(
+                        url: track.url,
+                        isCurrent: audio.currentTrack?.url == track.url,
+                        onPlay: {
+                            playArtistFile(
+                                track,
+                                artist: artist
+                            )
+                        }
+                    )
+                }
             }
         }
+    }
+
+    private func albumDisplayGroups(for tracks: [AudioTrack]) -> [AlbumDisplayGroup] {
+        var groups: [AlbumDisplayGroup] = []
+
+        for track in tracks {
+            let album = track.album.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fallbackFolder = track.url.deletingLastPathComponent().lastPathComponent
+            let title = album.isEmpty ? fallbackFolder : album
+            let key = album.isEmpty
+                ? "folder:\(track.url.deletingLastPathComponent().standardizedFileURL.path)"
+                : "album:\(album.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current))"
+
+            if let lastIndex = groups.indices.last, groups[lastIndex].id == key {
+                groups[lastIndex].tracks.append(track)
+            } else {
+                groups.append(AlbumDisplayGroup(id: key, title: title, tracks: [track]))
+            }
+        }
+
+        return groups
     }
 
     // MARK: - Root Files
@@ -2062,6 +2087,69 @@ private struct ArtistGroup:
         for track in tracks {
 
             hasher.combine(track.url)
+        }
+    }
+}
+
+private struct AlbumDisplayGroup: Identifiable {
+    let id: String
+    let title: String
+    var tracks: [AudioTrack]
+}
+
+private struct AlbumPlaylistSectionHeader: View {
+    let title: String
+    let count: Int
+    let artworkData: Data?
+
+    @State private var artworkImage: NSImage?
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Group {
+                if let artworkImage {
+                    Image(nsImage: artworkImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    ZStack {
+                        Color.white.opacity(0.06)
+                        Image(systemName: "opticaldisc")
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                    }
+                }
+            }
+            .frame(width: 34, height: 34)
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title.isEmpty ? "Без альбома" : title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.90))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text("\(count) треков")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.52))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 10)
+        .padding(.bottom, 5)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.white.opacity(0.12))
+                .frame(height: 1)
+        }
+        .task(id: artworkData) {
+            guard let artworkData else {
+                artworkImage = nil
+                return
+            }
+            artworkImage = await LibraryArtworkThumbnailCache.thumbnail(from: artworkData, maxPixelSize: 120)
         }
     }
 }
