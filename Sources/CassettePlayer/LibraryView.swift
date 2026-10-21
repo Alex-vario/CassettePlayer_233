@@ -1531,13 +1531,38 @@ struct LibraryView: View {
         return grouped.map { key, tracks in
             ArtistGroup(
                 name: displayNames[key] ?? key,
-                tracks: tracks.sorted {
-                    $0.title.localizedStandardCompare($1.title) == .orderedAscending
-                }
+                tracks: tracks.sorted(by: artistTrackOrder)
             )
         }.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
+    }
+
+    private nonisolated static func artistTrackOrder(_ lhs: AudioTrack, _ rhs: AudioTrack) -> Bool {
+        let leftAlbum = lhs.album.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rightAlbum = rhs.album.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Prefer album tags; when missing, use the containing folder as the album identity.
+        let leftAlbumKey = leftAlbum.isEmpty ? lhs.url.deletingLastPathComponent().lastPathComponent : leftAlbum
+        let rightAlbumKey = rightAlbum.isEmpty ? rhs.url.deletingLastPathComponent().lastPathComponent : rightAlbum
+        let albumComparison = leftAlbumKey.localizedStandardCompare(rightAlbumKey)
+        if albumComparison != .orderedSame {
+            return albumComparison == .orderedAscending
+        }
+
+        let leftDisc = lhs.discNumber ?? 1
+        let rightDisc = rhs.discNumber ?? 1
+        if leftDisc != rightDisc { return leftDisc < rightDisc }
+
+        if let leftNumber = lhs.trackNumber, let rightNumber = rhs.trackNumber, leftNumber != rightNumber {
+            return leftNumber < rightNumber
+        }
+        if lhs.trackNumber != nil && rhs.trackNumber == nil { return true }
+        if lhs.trackNumber == nil && rhs.trackNumber != nil { return false }
+
+        let titleComparison = lhs.title.localizedStandardCompare(rhs.title)
+        if titleComparison != .orderedSame { return titleComparison == .orderedAscending }
+        return lhs.url.path.localizedStandardCompare(rhs.url.path) == .orderedAscending
     }
 
     /// Canonicalizes known catalogue variants without correcting arbitrary typos.
