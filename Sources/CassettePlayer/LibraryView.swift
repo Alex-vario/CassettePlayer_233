@@ -119,7 +119,7 @@ private struct CachedLibraryIndex: Codable {
     }
 
     init(root: URL, folders: [URL], tracks: [AudioTrack]) {
-        version = 1
+        version = 2
         rootPath = root.standardizedFileURL.path
         folderPaths = folders.map { $0.path }
 
@@ -182,7 +182,7 @@ private actor LibraryIndexStore {
         if !forceRefresh,
            let data = try? Data(contentsOf: cacheURL),
            let diskIndex = try? JSONDecoder().decode(CachedLibraryIndex.self, from: data),
-           diskIndex.version == 1,
+           diskIndex.version == 2,
            diskIndex.rootPath == rootPath {
             cachedIndex = diskIndex
             return diskIndex.snapshot
