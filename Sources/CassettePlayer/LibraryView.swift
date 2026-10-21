@@ -370,7 +370,7 @@ struct LibraryView: View {
             folderArtworkByPath = [:]
             folderArtworkGeneration += 1
             LibraryArtworkThumbnailCache.clear()
-            if !libraryFilterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if libraryFilterText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
                 loadSearchIndexIfNeeded()
             }
         }
@@ -1880,6 +1880,7 @@ struct LibraryView: View {
             artists = await Task.detached(priority: .utility) {
                 Self.makeArtistGroups(from: index.tracks)
             }.value
+            scheduleFilterSearch(normalizedFilterQuery)
         }
     }
 
