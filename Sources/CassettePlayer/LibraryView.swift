@@ -1062,16 +1062,18 @@ struct LibraryView: View {
                             noFilterResults("Треки не найдены")
                         } else {
                             searchSectionTitle("ТРЕКИ", count: filteredSearchTracks.count)
-                            ForEach(filteredSearchTracks) { track in
-                                TrackRow(
-                                    url: track.url,
-                                    isCurrent: audio.currentTrack?.url == track.url,
-                                    onPlay: {
-                                        audio.setPlaylist(filteredSearchTracks)
-                                        audio.play(track)
-                                        onClose()
-                                    }
-                                )
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(filteredSearchTracks) { track in
+                                    TrackRow(
+                                        url: track.url,
+                                        isCurrent: audio.currentTrack?.url == track.url,
+                                        onPlay: {
+                                            audio.setPlaylist(filteredSearchTracks)
+                                            audio.play(track)
+                                            onClose()
+                                        }
+                                    )
+                                }
                             }
                         }
 
@@ -1711,8 +1713,6 @@ struct LibraryView: View {
             artists = await Task.detached(priority: .utility) {
                 Self.makeArtistGroups(from: index.tracks)
             }.value
-            scheduleFilterSearch(normalizedFilterQuery)
-
             let visibleFolder = currentFolder ?? root
             let folderResult = Self.scanFolder(visibleFolder)
             folders = folderResult.folders
@@ -1720,6 +1720,7 @@ struct LibraryView: View {
 
             isLoading = false
             isSearchIndexLoading = false
+            scheduleFilterSearch(normalizedFilterQuery)
         }
     }
 
@@ -2774,6 +2775,7 @@ private struct TrackRow: View {
     let onPlay: () -> Void
 
     @State private var artist = ""
+    @State private var duration = "--:--"
 
     var body: some View {
 
@@ -2851,11 +2853,7 @@ private struct TrackRow: View {
                     minLength: 4
                 )
 
-                Text(
-                    durationText(
-                        url: url
-                    )
-                )
+                Text(duration)
                 .font(
                     .system(
                         size: 10,
@@ -2890,41 +2888,24 @@ private struct TrackRow: View {
         )
         .task {
             artist = (await AudioTrack.load(from: url)).artist
-        }
-    }
+            guard !Task.isCancelled else { return }
 
-    private func durationText(
-        url: URL
-    ) -> String {
-
-        guard
-            let file =
-                try? AVAudioFile(
-                    forReading: url
+            // Opening audio files just to read their duration must never happen
+            // synchronously in body; load it on a utility task for visible rows.
+            let loadedDuration = await Task.detached(priority: .utility) {
+                guard let file = try? AVAudioFile(forReading: url) else {
+                    return "--:--"
+                }
+                let seconds = max(
+                    0,
+                    Int(Double(file.length) / file.processingFormat.sampleRate)
                 )
-        else {
-            return "--:--"
+                return String(format: "%d:%02d", seconds / 60, seconds % 60)
+            }.value
+
+            guard !Task.isCancelled else { return }
+            duration = loadedDuration
         }
-
-        let duration =
-            Double(
-                file.length
-            )
-            / file.processingFormat.sampleRate
-
-        let totalSeconds =
-            max(
-                0,
-                Int(
-                    duration
-                )
-            )
-
-        return String(
-            format: "%d:%02d",
-            totalSeconds / 60,
-            totalSeconds % 60
-        )
     }
 }
 
